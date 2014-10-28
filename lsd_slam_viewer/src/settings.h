@@ -31,6 +31,8 @@ extern bool showConstraints;
 extern bool showCurrentCamera;
 extern bool showCurrentPointcloud;
 
+extern bool debugMode;
+
 extern float scaledDepthVarTH;
 extern float absDepthVarTH;
 extern int minNearSupport;
@@ -41,3 +43,7 @@ extern bool saveAllVideo;
 extern int numRefreshedAlready;
 
 extern double lastFrameTime;
+
+extern float planeColor[3];
+
+extern int downsampleFactor;

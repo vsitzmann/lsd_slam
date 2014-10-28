@@ -71,6 +71,8 @@ public:
 	// may be updated by kf-graph.
 	Sophus::Sim3f camToWorld;
 
+	std::vector<Eigen::Vector3f> keyframePointcloud;
+
 private:
 	// camera parameter
 	// fixed.
@@ -85,7 +87,6 @@ private:
 
 	// pointcloud data & respective buffer
 	InputPointDense* originalInput;
-
 
 	// buffer & how many
 	GLuint vertexBufferId;

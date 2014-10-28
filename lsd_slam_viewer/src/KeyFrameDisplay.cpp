@@ -194,6 +194,9 @@ void KeyFrameDisplay::refreshPC()
 			tmpBuffer[vertexBufferNumPoints].color[1] = originalInput[x+y*width].color[1];
 			tmpBuffer[vertexBufferNumPoints].color[0] = originalInput[x+y*width].color[2];
 
+			Eigen::Vector3f pt = camToWorld * (Eigen::Vector3f((x*fxi + cxi), (y*fyi + cyi), 1) * depth);
+			keyframePointcloud.push_back(pt);
+
 			vertexBufferNumPoints++;
 			displayed++;
 		}

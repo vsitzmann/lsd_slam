@@ -17,7 +17,7 @@
 * You should have received a copy of the GNU General Public License
 * along with dvo. If not, see <http://www.gnu.org/licenses/>.
 */
-
+#define GL_GLEXT_PROTOTYPES 1
 
 #include "KeyFrameGraphDisplay.h"
 #include "KeyFrameDisplay.h"
@@ -25,12 +25,21 @@
 #include <sstream>
 #include <fstream>
 
+#include <GL/glx.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
+
+#include "PlaneFitting.h"
+
 #include "ros/package.h"
 
 KeyFrameGraphDisplay::KeyFrameGraphDisplay()
 {
 	flushPointcloud = false;
 	printNumbers = false;
+	planeTracking = false;
+
+	planeBufferIdValid = false;
 }
 
 KeyFrameGraphDisplay::~KeyFrameGraphDisplay()
@@ -136,6 +145,33 @@ void KeyFrameGraphDisplay::draw()
 		glEnd();
 	}
 
+	/**** For plane estimation *****/
+
+	if(planeTracking){
+		refreshPlane();
+
+		glDisable(GL_LIGHTING);
+
+		glPushMatrix();
+
+				glLineWidth(1.0);
+
+				glBindBuffer(GL_ARRAY_BUFFER, planeBufferId);
+
+				glVertexPointer(3, GL_FLOAT, sizeof(MyVertex), 0);
+				glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(MyVertex), (const void*) (3*sizeof(float)));
+
+				glEnableClientState(GL_VERTEX_ARRAY);
+				glEnableClientState(GL_COLOR_ARRAY);
+
+				glDrawArrays(GL_LINE_LOOP, 0, planeBufferNumPoints);
+
+				glDisableClientState(GL_COLOR_ARRAY);
+				glDisableClientState(GL_VERTEX_ARRAY);
+
+			glPopMatrix();
+	}
+
 	dataMutex.unlock();
 }
 
@@ -150,6 +186,8 @@ void KeyFrameGraphDisplay::addMsg(lsd_slam_viewer::keyframeMsgConstPtr msg)
 
 	//	printf("added new KF, now there are %d!\n", (int)keyframes.size());
 	}
+
+	if(keyframes.size()==8) beginPlaneTracking();
 
 	keyframesByID[msg->id]->setFrom(msg);
 	dataMutex.unlock();
@@ -205,4 +243,80 @@ void KeyFrameGraphDisplay::addGraphMsg(lsd_slam_viewer::keyframeGraphMsgConstPtr
 	dataMutex.unlock();
 
 //	printf("graph update: %d constraints, %d poses\n", msg->numConstraints, msg->numFrames);
+}
+
+void KeyFrameGraphDisplay::beginPlaneTracking(){
+	if(debugMode)
+			std::cerr<<__PRETTY_FUNCTION__<<std::endl;
+
+	std::vector<KeyFrameDisplay*> keyframes2;
+
+	for(std::map<int, KeyFrameDisplay*>::iterator it = keyframesByID.begin(); it!=keyframesByID.end(); it++){
+		keyframes2.push_back(it->second);
+	}
+
+	std::vector<Eigen::Vector3f> inliers = PlaneFitting::ransac(keyframes2, 10, 0.04);
+
+	Eigen::MatrixXf mat((int)inliers.size(), 3);
+
+	for(unsigned int i = 0; i<inliers.size(); i++){
+		mat(i, 0) = inliers[i][0];
+		mat(i, 1) = inliers[i][1];
+		mat(i, 2) = inliers[i][2];
+	}
+
+	printf("Number of initial inliers: %d", inliers.size());
+
+	covarianceMatrix = PlaneFitting::pcaPlaneFitting(mat, tangent, bitangent, center);
+
+	std::cout<<tangent<<std::endl;
+	std::cout<<bitangent<<std::endl;
+	std::cout<<center<<std::endl;
+	std::cout<<covarianceMatrix<<std::endl;
+
+	planeTracking = true;
+}
+
+void KeyFrameGraphDisplay::refreshPlane(){
+	if(debugMode)
+			std::cerr<<__PRETTY_FUNCTION__<<std::endl;
+
+	Eigen::Vector3f triangleWidth = tangent/10;
+	Eigen::Vector3f triangleHeight = bitangent/10;
+	Eigen::Vector3f virtualCenter = center-2.5*tangent-2.5*bitangent;
+
+	int verticeCount = 0;
+
+	MyVertex triangleVertices[5000];
+
+	while(verticeCount<4998){
+		virtualCenter +=triangleHeight;
+
+		for(int i = 0; i<50; i++)
+		{
+			for(int j = 1; j>=0; j--)
+			{
+				triangleVertices[verticeCount].point[0] = virtualCenter[0] + triangleWidth[0]*i+j*triangleHeight[0];
+				triangleVertices[verticeCount].point[1] = virtualCenter[1] + triangleWidth[1]*i+j*triangleHeight[1];
+				triangleVertices[verticeCount].point[2] = virtualCenter[2] + triangleWidth[2]*i+j*triangleHeight[2];
+
+	//			if(debugMode)
+	//				printf("x: %f, y: %f, z: %f\n", triangleVertices[verticeCount].point[0], triangleVertices[verticeCount].point[1], triangleVertices[verticeCount].point[2]);
+
+				triangleVertices[verticeCount].color[0] = 100;
+				triangleVertices[verticeCount].color[1] = planeColor[0];
+				triangleVertices[verticeCount].color[2] = planeColor[1];
+				triangleVertices[verticeCount].color[3] = planeColor[2];
+
+				verticeCount++;
+			}
+		}
+	}
+
+	planeBufferNumPoints = verticeCount;
+
+	planeBufferId = 0;
+	glGenBuffers(1, &planeBufferId);
+	glBindBuffer(GL_ARRAY_BUFFER, planeBufferId);         // for vertex coordinates
+	glBufferData(GL_ARRAY_BUFFER, sizeof(MyVertex) * planeBufferNumPoints, triangleVertices, GL_STATIC_DRAW);
 }

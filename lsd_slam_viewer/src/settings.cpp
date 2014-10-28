@@ -41,7 +41,13 @@ int sparsifyFactor = 1;
 
 bool saveAllVideo = false;
 
+bool debugMode = true;
+
 int numRefreshedAlready = 0;
 
 // cut-off after this
 double lastFrameTime = 1e15;
+
+float planeColor [3] = {155, 155, 155};
+
+int downsampleFactor = 1;

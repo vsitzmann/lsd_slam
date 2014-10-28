@@ -49,6 +49,7 @@ set(SOURCE_FILES
   src/KeyFrameDisplay.cpp
   src/KeyFrameGraphDisplay.cpp
   src/settings.cpp
+  src/PlaneFitting.cpp
 )
 
 set(HEADER_FILES     
@@ -56,6 +57,7 @@ set(HEADER_FILES
   src/KeyFrameDisplay.h
   src/KeyFrameGraphDisplay.h
   src/settings.h
+  src/PlaneFitting.h
 )
 
 include_directories(

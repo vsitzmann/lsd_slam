@@ -28,8 +28,12 @@
 #include "lsd_slam_viewer/keyframeMsg.h"
 #include "boost/thread.hpp"
 
-class KeyFrameDisplay;
+#include <Eigen/Core>
 
+#include "QGLViewer/qglviewer.h"
+
+class KeyFrameDisplay;
+class PlaneFitting;
 
 struct GraphConstraint
 {
@@ -63,14 +67,30 @@ public:
 	void addMsg(lsd_slam_viewer::keyframeMsgConstPtr msg);
 	void addGraphMsg(lsd_slam_viewer::keyframeGraphMsgConstPtr msg);
 
-
+	void beginPlaneTracking();
 
 	bool flushPointcloud;
 	bool printNumbers;
 private:
+	/***** Functions ******/
+	void refreshPlane();
+
+
+	/***** Variables *****/
 	std::map<int, KeyFrameDisplay*> keyframesByID;
 	std::vector<KeyFrameDisplay*> keyframes;
 	std::vector<GraphConstraintPt> constraints;
+
+	Eigen::Matrix3f covarianceMatrix;
+	Eigen::Vector3f center;
+	Eigen::Vector3f tangent;
+	Eigen::Vector3f bitangent;
+
+	bool planeTracking;
+
+	unsigned int planeBufferId;
+	int planeBufferNumPoints;
+	bool planeBufferIdValid;
 
 	boost::mutex dataMutex;
 

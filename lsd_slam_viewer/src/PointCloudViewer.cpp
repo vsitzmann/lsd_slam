@@ -237,7 +237,6 @@ void PointCloudViewer::draw()
 	if(showCurrentPointcloud)
 		currentCamDisplay->drawPC(pointTesselation, 1);
 
-
 	graphDisplay->draw();
 
 
