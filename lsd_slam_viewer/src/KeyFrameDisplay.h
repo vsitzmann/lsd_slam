@@ -51,15 +51,15 @@ public:
 	KeyFrameDisplay();
 	~KeyFrameDisplay();
 
+	std::vector<Eigen::Vector3f> keyframePointcloud;
 
 	void setFrom(lsd_slam_viewer::keyframeMsgConstPtr msg);
 	void drawCam(float lineWidth = 1, float* color = 0);
 	void drawPC(float pointSize = 1, float alpha = 1);
 	void refreshPC();
+	void calcKeyframeCovMatrix(Eigen::Matrix3f &covarianceMatrix, Eigen::Vector3f &keyframeCenter, const Eigen::Vector3f &center, const Eigen::Vector3f &tangent, const Eigen::Vector3f &bitangent);
 
 	int flushPC(std::ofstream* f);
-
-
 
 	int id;
 	double time;
@@ -70,8 +70,6 @@ public:
 	// camera pose
 	// may be updated by kf-graph.
 	Sophus::Sim3f camToWorld;
-
-	std::vector<Eigen::Vector3f> keyframePointcloud;
 
 private:
 	// camera parameter

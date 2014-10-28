@@ -40,6 +40,9 @@ KeyFrameGraphDisplay::KeyFrameGraphDisplay()
 	planeTracking = false;
 
 	planeBufferIdValid = false;
+
+	totalInlierNumber = 0;
+	keyframeUpdateTracker = 0;
 }
 
 KeyFrameGraphDisplay::~KeyFrameGraphDisplay()
@@ -64,7 +67,6 @@ void KeyFrameGraphDisplay::draw()
 		if((showKFPointclouds && (int)i > cutFirstNKf) || i == keyframes.size()-1)
 			keyframes[i]->drawPC(pointTesselation, 1);
 	}
-
 
 	if(flushPointcloud)
 	{
@@ -187,7 +189,7 @@ void KeyFrameGraphDisplay::addMsg(lsd_slam_viewer::keyframeMsgConstPtr msg)
 	//	printf("added new KF, now there are %d!\n", (int)keyframes.size());
 	}
 
-	if(keyframes.size()==8) beginPlaneTracking();
+	if(keyframes.size()==beginPlaneTrackingIndex) beginPlaneTracking();
 
 	keyframesByID[msg->id]->setFrom(msg);
 	dataMutex.unlock();
@@ -265,14 +267,9 @@ void KeyFrameGraphDisplay::beginPlaneTracking(){
 		mat(i, 2) = inliers[i][2];
 	}
 
-	printf("Number of initial inliers: %d", inliers.size());
+	totalInlierNumber = inliers.size();
 
 	covarianceMatrix = PlaneFitting::pcaPlaneFitting(mat, tangent, bitangent, center);
-
-	std::cout<<tangent<<std::endl;
-	std::cout<<bitangent<<std::endl;
-	std::cout<<center<<std::endl;
-	std::cout<<covarianceMatrix<<std::endl;
 
 	planeTracking = true;
 }
@@ -280,6 +277,27 @@ void KeyFrameGraphDisplay::beginPlaneTracking(){
 void KeyFrameGraphDisplay::refreshPlane(){
 	if(debugMode)
 			std::cerr<<__PRETTY_FUNCTION__<<std::endl;
+
+	//Check whether a new keyframe Pointcloud is availble.
+	if(keyframeUpdateTracker == keyframes.size()-1) return;
+
+	keyframeUpdateTracker = keyframes.size()-1;
+
+	Eigen::Matrix3f keyframeCovMatrix;
+	Eigen::Vector3f keyframeCenter;
+
+	int keyframePointNum = keyframes[keyframes.size()-1]->keyframePointcloud.size();
+
+	keyframes[keyframes.size()-1]->calcKeyframeCovMatrix(keyframeCovMatrix, center, center, tangent, bitangent);
+
+	covarianceMatrix = ( covarianceMatrix*totalInlierNumber + keyframeCovMatrix*keyframePointNum) / float(keyframePointNum+totalInlierNumber);
+
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(covarianceMatrix);
+
+	tangent =  eig.eigenvectors().col(2);
+	bitangent =  eig.eigenvectors().col(1);
+
+	totalInlierNumber += keyframePointNum;
 
 	Eigen::Vector3f triangleWidth = tangent/10;
 	Eigen::Vector3f triangleHeight = bitangent/10;

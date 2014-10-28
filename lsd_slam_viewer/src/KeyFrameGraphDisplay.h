@@ -88,6 +88,9 @@ private:
 
 	bool planeTracking;
 
+	int totalInlierNumber;
+	int keyframeUpdateTracker;
+
 	unsigned int planeBufferId;
 	int planeBufferNumPoints;
 	bool planeBufferIdValid;
