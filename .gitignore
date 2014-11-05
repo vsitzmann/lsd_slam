@@ -26,6 +26,11 @@ lsd_slam_viewer/thirdparty/Sophus/CMakeFiles/
 lsd_slam_viewer/thirdparty/Sophus/Makefile
 lsd_slam_viewer/thirdparty/Sophus/SophusConfig.cmake
 
+lsd_slam_viewer/.settings/*
+lsd_slam_viewer/.qglviewer.xml
+.qglviewer.xml
+
+
 cmake_install.cmake
 *.cfgc
 
