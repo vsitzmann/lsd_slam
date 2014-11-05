@@ -24,6 +24,9 @@
 #include "settings.h"
 #include "PointCloudViewer.h"
 
+#include "QGLImageWindow.h"
+#include <X11/Xlib.h>
+
 #include <dynamic_reconfigure/server.h>
 #include "lsd_slam_viewer/LSDSLAMViewerParamsConfig.h"
 #include <qapplication.h>
@@ -183,6 +186,7 @@ int main( int argc, char** argv )
 		rosThread = boost::thread(rosThreadLoop, argc, argv);
 	}
 
+	displayThreadLoop(&application);
 
 	application.exec();
 

@@ -40,7 +40,7 @@ rosbuild_genmsg()
 # SSE flags
 rosbuild_check_for_sse()
 set(CMAKE_CXX_FLAGS
-   "${SSE_FLAGS}"
+   "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -std=c++0x"
 )
 
 # SSE Sources files
@@ -50,6 +50,7 @@ set(SOURCE_FILES
   src/KeyFrameGraphDisplay.cpp
   src/settings.cpp
   src/PlaneFitting.cpp
+  src/QGLImageWindow.cpp
 )
 
 set(HEADER_FILES     
@@ -58,6 +59,7 @@ set(HEADER_FILES
   src/KeyFrameGraphDisplay.h
   src/settings.h
   src/PlaneFitting.h
+  src/QGLImageWindow.h
 )
 
 include_directories(
@@ -70,6 +72,4 @@ target_link_libraries(viewer ${QGLViewer_LIBRARIES} ${QT_LIBRARIES} ${QGLVIEWER_
 
 rosbuild_link_boost(viewer thread)
 
-
 rosbuild_add_executable(videoStitch src/main_stitchVideos.cpp)
-
