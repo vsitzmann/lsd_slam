@@ -30,6 +30,8 @@
 #include "lsd_slam_viewer/keyframeMsg.h"
 #include "lsd_slam_viewer/keyframeGraphMsg.h"
 
+#include "sophus/sim3.hpp"
+
 #include "QGLViewer/keyFrameInterpolator.h"
 
 class QApplication;
@@ -160,6 +162,9 @@ public:
 	void addFrameMsg(lsd_slam_viewer::keyframeMsgConstPtr msg);
 	void addGraphMsg(lsd_slam_viewer::keyframeGraphMsgConstPtr msg);
 
+	// camera pose
+	// may be updated by kf-graph.
+	Sophus::Sim3f camToWorld;
 
 protected :
 	virtual void draw();
@@ -216,8 +221,6 @@ private:
 	bool animationPlaybackEnabled;
 	double animationPlaybackTime;
 	int animationPlaybackID;
-
-
 
 	double lastAnimTime;
 

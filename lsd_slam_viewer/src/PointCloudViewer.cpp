@@ -39,8 +39,8 @@
 #include "KeyFrameDisplay.h"
 #include "KeyFrameGraphDisplay.h"
 
-#include <iostream>
 #include <fstream>
+#include "util/SophusUtil.h"
 
 PointCloudViewer::PointCloudViewer()
 {
@@ -120,6 +120,7 @@ void PointCloudViewer::reset()
 
 void PointCloudViewer::addFrameMsg(lsd_slam_viewer::keyframeMsgConstPtr msg)
 {
+
 	meddleMutex.lock();
 
 	if(!msg->isKeyframe)
@@ -133,8 +134,21 @@ void PointCloudViewer::addFrameMsg(lsd_slam_viewer::keyframeMsgConstPtr msg)
 		lastAnimTime = lastCamTime = msg->time;
 		lastCamID = msg->id;
 	}
-	else
+	else {
 		graphDisplay->addMsg(msg);
+
+		memcpy(camToWorld.data(), msg->camToWorld.data(), 7*sizeof(float));
+
+		Eigen::Vector3f trans = camToWorld.translation().cast<float>();
+		Sophus::Quaternionf quat = camToWorld.quaternion().cast<float>();
+//		quat.normalize();
+
+		qglviewer::Vec cameraPos (trans[0], trans[1], trans[2]);
+		qglviewer::Quaternion cameraRot (quat.w(), quat.x(), quat.y(), quat.z());
+
+		camera()->setPosition(cameraPos);
+		camera()->setOrientation(cameraRot);
+	}
 
 	meddleMutex.unlock();
 }
@@ -229,8 +243,6 @@ void PointCloudViewer::draw()
 		}
 	}
 
-
-
 	if(showCurrentCamera)
 		currentCamDisplay->drawCam(2*lineTesselation, 0);
 
@@ -243,9 +255,6 @@ void PointCloudViewer::draw()
 	glPopMatrix();
 
 	meddleMutex.unlock();
-
-
-
 
 	if(saveAllVideo)
 	{
