@@ -67,6 +67,14 @@ void dynConfCb(lsd_slam_viewer::LSDSLAMViewerParamsConfig &config, uint32_t leve
 
 	saveAllVideo = config.saveAllVideo;
 
+	debugMode = config.debugMode;
+
+	FX1 = config.FX1;
+	FY1 = config.FY1;
+	CX1 = config.CX1;
+	CY1 = config.CY1;
+
+
 }
 
 void frameCb(lsd_slam_viewer::keyframeMsgConstPtr msg)

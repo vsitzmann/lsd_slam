@@ -46,5 +46,10 @@ extern double lastFrameTime;
 
 extern float planeColor[3];
 
+extern float FX1;
+extern float FY1;
+extern float CX1;
+extern float CY1;
+
 extern int downsampleFactor;
 extern int beginPlaneTrackingIndex;

@@ -50,5 +50,10 @@ double lastFrameTime = 1e15;
 
 float planeColor [3] = {155, 155, 155};
 
+float FX1;
+float FY1;
+float CX1;
+float CY1;
+
 int downsampleFactor = 1;
 int beginPlaneTrackingIndex =20;

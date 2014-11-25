@@ -33,6 +33,7 @@
 #include <GL/glx.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
+#include <GL/glut.h>
 
 #include "QGLViewer/manipulatedCameraFrame.h"
 
@@ -40,7 +41,6 @@
 #include "KeyFrameGraphDisplay.h"
 
 #include <fstream>
-#include "util/SophusUtil.h"
 
 PointCloudViewer::PointCloudViewer()
 {
@@ -137,18 +137,95 @@ void PointCloudViewer::addFrameMsg(lsd_slam_viewer::keyframeMsgConstPtr msg)
 	else {
 		graphDisplay->addMsg(msg);
 
+
+//			std::cerr << camera()->type() << std::endl;
+//
+//			double fx = msg->fx;
+//			double fy = msg->fy;
+//			double cx = msg->cx;
+//			double cy = msg->cy;
+//
+//			double modelViewMatrix [16];
+//			GLdouble currentProjectionMatrix [16];
+//			float newProjectionMatrix[12];
+//
+//			camera()->getProjectionMatrix(currentProjectionMatrix);
+//			camera()->getModelViewMatrix(modelViewMatrix);
+//
+//			printf("Current Projection Matrix: \n");
+//
+//			for(int i = 0; i<12; i++){
+//				newProjectionMatrix[i]=(float)currentProjectionMatrix[i];
+//
+//				if(i%4==0) printf("\n");
+//
+//				printf("%f  ", currentProjectionMatrix[i]);
+//			}
+//
+//			printf("\n");
+//			printf("\n");
+//
+//			printf("Model View Matrix: \n");
+//
+//
+//			for(int i = 0; i<16; i++){
+//					if(i%4==0) printf("\n");
+//
+//					printf("%f  ", modelViewMatrix[i]);
+//				}
+//
+//
+//			printf("\n");
+//			printf("\n");
+//
+//			newProjectionMatrix[0]=1.530520;
+//			//newProjectionMatrix[2]=2.414213;
+//			newProjectionMatrix[5]=2.414213;
+//			//newProjectionMatrix[6]=CY1;
+//
+//			/*newProjectionMatrix[0]=FX1;
+//			newProjectionMatrix[2]=CX1;
+//			newProjectionMatrix[5]=FY1;
+//			newProjectionMatrix[6]=CY1;*/
+//
+//			printf("New Projection Matrix: \n");
+//
+//			for(int i = 0; i<12; i++){
+//					if(i%4==0) printf("\n");
+//
+//					printf("%f  ", newProjectionMatrix[i]);
+//				}
+//
+//			printf("\n");
+//
+//
+//		/*
+//		* FX'       0       CX'        	0
+//		* 0  		FY'     CY'        	0
+//		* 0        	0 		-1.01004  	-1.3926
+//		* 0        	0       -1       	0
+//		*/
+//
+//		//camera()->loadProjectionMatrix(newProjectionMatrix);
+
 		memcpy(camToWorld.data(), msg->camToWorld.data(), 7*sizeof(float));
 
 		Eigen::Vector3f trans = camToWorld.translation().cast<float>();
 		Sophus::Quaternionf quat = camToWorld.quaternion().cast<float>();
-//		quat.normalize();
+		//quat.normalize();
 
 		qglviewer::Vec cameraPos (trans[0], trans[1], trans[2]);
 		qglviewer::Quaternion cameraRot (quat.w(), quat.x(), quat.y(), quat.z());
+		qglviewer::Vec upVector(0,1,0);
+
+		// Why do I have to normalize the quaterion?
+		cameraRot.normalize();
 
 		camera()->setPosition(cameraPos);
 		camera()->setOrientation(cameraRot);
+		camera()->setFieldOfView(1.5);
 	}
+
 
 	meddleMutex.unlock();
 }
@@ -251,6 +328,8 @@ void PointCloudViewer::draw()
 
 	graphDisplay->draw();
 
+	//the camera field of view, the image aspect ratio, the near and far clipping planes
+	//gluPerspective(90, 2, 0.1, 10);
 
 	glPopMatrix();
 
