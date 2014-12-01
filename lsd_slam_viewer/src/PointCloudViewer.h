@@ -224,6 +224,9 @@ private:
 
 	double lastAnimTime;
 
+	//The projectionMatrix inferred from the camera parameters
+	// fx, fy, cx, cy, width and height
+	Eigen::Matrix<double, 4, 4, Eigen::RowMajor> camProjectionMatrix;
 
 	void remakeAnimation();
 };

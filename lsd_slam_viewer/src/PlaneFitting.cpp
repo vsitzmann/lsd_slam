@@ -20,7 +20,7 @@ std::vector<Eigen::Vector3f> PlaneFitting::ransac(std::vector<KeyFrameDisplay*> 
 	if(debugMode)
 	{
 		std::cerr<<__PRETTY_FUNCTION__<<std::endl;
-		printf("keyframe Diplay size: %u\n", keyframeDisplays.size());
+		printf("keyframe Diplay size: %lu\n", keyframeDisplays.size());
 	}
 
 
@@ -40,7 +40,7 @@ std::vector<Eigen::Vector3f> PlaneFitting::ransac(std::vector<KeyFrameDisplay*> 
 	globalPointCloud.reserve(absolutePointNumber);
 
 	if(debugMode)
-		printf("joining keyframe pointclouds to one pointcloud...\n", absolutePointNumber);
+		printf("joining keyframe pointclouds to one pointcloud...\n");
 
 	for(unsigned int i =0; i<keyframeDisplays.size(); i++)
 	{
@@ -51,7 +51,7 @@ std::vector<Eigen::Vector3f> PlaneFitting::ransac(std::vector<KeyFrameDisplay*> 
 	int pos1, pos2, pos3;
 	Eigen::Vector3f P1, P2, P3, P;
 	double dis;
-	double bestPoints[3];
+	double bestPoints[3] = {0};
 	Eigen::Vector4f modelParameters;
 
 	for (int i=0; i < iterations; i++)
@@ -147,7 +147,7 @@ Eigen::Vector4f PlaneFitting::calcPlaneParams(Eigen::Vector3f P1, Eigen::Vector3
 }
 
 void PlaneFitting::makeInlierPC(std::vector<Eigen::Vector3f> inliers, MyVertex * vertexBuffer, float color[3]){
-	for(int i = 0; i<inliers.size(); i++)
+	for(unsigned int i = 0; i<inliers.size(); i++)
 	{
 		vertexBuffer[i].point[0] = inliers[i][0];
 		vertexBuffer[i].point[1] = inliers[i][1];

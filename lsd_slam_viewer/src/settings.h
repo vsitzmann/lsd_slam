@@ -52,4 +52,4 @@ extern float CX1;
 extern float CY1;
 
 extern int downsampleFactor;
-extern int beginPlaneTrackingIndex;
+extern unsigned int beginPlaneTrackingIndex;

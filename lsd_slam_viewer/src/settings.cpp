@@ -56,4 +56,4 @@ float CX1;
 float CY1;
 
 int downsampleFactor = 1;
-int beginPlaneTrackingIndex =20;
+unsigned int beginPlaneTrackingIndex =20;

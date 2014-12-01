@@ -19,7 +19,11 @@
 */
 
 #define GL_GLEXT_PROTOTYPES 1
+
 #include "PointCloudViewer.h"
+#include "KeyFrameDisplay.h"
+#include "KeyFrameGraphDisplay.h"
+
 #include "qfiledialog.h"
 #include "qcoreapplication.h"
 #include <stdio.h>
@@ -29,16 +33,12 @@
 #include <zlib.h>
 #include <iostream>
 
-
 #include <GL/glx.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
 #include <GL/glut.h>
 
 #include "QGLViewer/manipulatedCameraFrame.h"
-
-#include "KeyFrameDisplay.h"
-#include "KeyFrameGraphDisplay.h"
 
 #include <fstream>
 
@@ -137,93 +137,71 @@ void PointCloudViewer::addFrameMsg(lsd_slam_viewer::keyframeMsgConstPtr msg)
 	else {
 		graphDisplay->addMsg(msg);
 
-
-//			std::cerr << camera()->type() << std::endl;
-//
-//			double fx = msg->fx;
-//			double fy = msg->fy;
-//			double cx = msg->cx;
-//			double cy = msg->cy;
-//
-//			double modelViewMatrix [16];
-//			GLdouble currentProjectionMatrix [16];
-//			float newProjectionMatrix[12];
-//
-//			camera()->getProjectionMatrix(currentProjectionMatrix);
-//			camera()->getModelViewMatrix(modelViewMatrix);
-//
-//			printf("Current Projection Matrix: \n");
-//
-//			for(int i = 0; i<12; i++){
-//				newProjectionMatrix[i]=(float)currentProjectionMatrix[i];
-//
-//				if(i%4==0) printf("\n");
-//
-//				printf("%f  ", currentProjectionMatrix[i]);
-//			}
-//
-//			printf("\n");
-//			printf("\n");
-//
-//			printf("Model View Matrix: \n");
-//
-//
-//			for(int i = 0; i<16; i++){
-//					if(i%4==0) printf("\n");
-//
-//					printf("%f  ", modelViewMatrix[i]);
-//				}
-//
-//
-//			printf("\n");
-//			printf("\n");
-//
-//			newProjectionMatrix[0]=1.530520;
-//			//newProjectionMatrix[2]=2.414213;
-//			newProjectionMatrix[5]=2.414213;
-//			//newProjectionMatrix[6]=CY1;
-//
-//			/*newProjectionMatrix[0]=FX1;
-//			newProjectionMatrix[2]=CX1;
-//			newProjectionMatrix[5]=FY1;
-//			newProjectionMatrix[6]=CY1;*/
-//
-//			printf("New Projection Matrix: \n");
-//
-//			for(int i = 0; i<12; i++){
-//					if(i%4==0) printf("\n");
-//
-//					printf("%f  ", newProjectionMatrix[i]);
-//				}
-//
-//			printf("\n");
-//
-//
-//		/*
-//		* FX'       0       CX'        	0
-//		* 0  		FY'     CY'        	0
-//		* 0        	0 		-1.01004  	-1.3926
-//		* 0        	0       -1       	0
-//		*/
-//
-//		//camera()->loadProjectionMatrix(newProjectionMatrix);
-
 		memcpy(camToWorld.data(), msg->camToWorld.data(), 7*sizeof(float));
 
-		Eigen::Vector3f trans = camToWorld.translation().cast<float>();
-		Sophus::Quaternionf quat = camToWorld.quaternion().cast<float>();
-		//quat.normalize();
+		Sophus::Sim3f w2c = camToWorld;
+		w2c.setScale(1);
+		w2c = w2c.inverse();
+		Eigen::Matrix4d modelViewMatrix = w2c.matrix().cast<double>();
 
-		qglviewer::Vec cameraPos (trans[0], trans[1], trans[2]);
-		qglviewer::Quaternion cameraRot (quat.w(), quat.x(), quat.y(), quat.z());
-		qglviewer::Vec upVector(0,1,0);
+		Eigen::Matrix4d transMatrix = Eigen::Matrix4d::Identity();
+		transMatrix(1,1) = -1;
+		transMatrix(2,2) = -1;
 
-		// Why do I have to normalize the quaterion?
-		cameraRot.normalize();
+		modelViewMatrix = transMatrix * modelViewMatrix;
 
-		camera()->setPosition(cameraPos);
-		camera()->setOrientation(cameraRot);
-		camera()->setFieldOfView(1.5);
+		camera()->setFromModelViewMatrix(modelViewMatrix.data());
+
+		//Projection and ModelView matrices of the previous frame
+		Eigen::Matrix4d oldProjectionMatrix;
+		Eigen::Matrix4d oldModelViewMatrix;
+
+		//This matrix holds the product of the projection and modelViewMatrix as
+		//instructed by the libQglViewer Documentation:
+		//http://www.libqglviewer.com/refManual/classqglviewer_1_1Camera.html#a3d4528247c30731f8440d86500a78629
+		Eigen::Matrix4d projectionModelViewMatrix;
+
+		//Get matrices of previous frame
+		camera()->getModelViewMatrix(oldModelViewMatrix.data());
+		camera()->getProjectionMatrix(oldProjectionMatrix.data());
+
+		camProjectionMatrix = Eigen::Matrix4d::Zero();
+
+		//Calculate camProjectionMatrix following the instructions from
+		//http://www.scratchapixel.com/old/lessons/3d-advanced-lessons/perspective-and-orthographic-projection-matrix/opengl-perspective-projection-matrix/
+		camProjectionMatrix(0,0) = 2*msg->fx/msg->width;
+		camProjectionMatrix(0,2) = msg->cx/msg->width;
+
+		camProjectionMatrix(1,1) = 2*msg->fy/msg->height;
+		camProjectionMatrix(1,2) = msg->cy/msg->height;
+
+		camProjectionMatrix(2,2) = -(camera()->zFar() + camera()->zNear())/(camera()->zFar()-camera()->zNear());
+		camProjectionMatrix(2,3) = -2*(camera()->zFar() * camera()->zNear())/(camera()->zFar()-camera()->zNear());
+		camProjectionMatrix(3,2) = -1;
+
+		/*** Deprecated: This was trying to use the "setFromProjectionMatrix"
+		//-Function of the libQGLViewer. This did not work.
+
+		//Multiply the camProjectionMatrix and the modelViewMatrix to obtain
+		//a matrix that transforms homogeneous coordinates in world coordinates
+		//into screen homogeneous coordinates in the camera coordinate system
+		projectionModelViewMatrix =  camProjectionMatrix*modelViewMatrix;
+
+		std::cout<<"Frame No. "<< msg->id <<"\n";
+		std::cout<<camProjectionMatrix<<" new calculated PM \n\n";
+		std::cout<<oldModelViewMatrix<<" old MV-M \n\n";
+		std::cout<<modelViewMatrix<<" new MV-M (from camToWorld sim3 object)\n\n";
+		std::cout<<oldProjectionMatrix<<" old PM \n\n";
+		std::cout<<"\n\n\n";
+
+		//Matrix to store the projectionModelViewMatrix in float, RowMajor
+		//(setFromProjectionMatrix normally takes a standard 2D-Array
+		//which is in Row-Major notation in C++) without the fourth line.
+		Eigen::Matrix <float, 3, 4, Eigen::RowMajor>  newProjectionMatrixFloat (3, 4);
+		newProjectionMatrixFloat = projectionModelViewMatrix.topRows(3).cast<float>();
+
+		//camera()->setFromProjectionMatrix(newProjectionMatrixFloat.data());
+		**//
 	}
 
 
@@ -262,9 +240,11 @@ void PointCloudViewer::draw()
 		resetRequested = false;
 	}
 
+	glMatrixMode(GL_PROJECTION);
+	glLoadMatrixd(camProjectionMatrix.data());
+	glMatrixMode(GL_MODELVIEW);
 
 	glPushMatrix();
-
 
 	if(animationPlaybackEnabled)
 	{
@@ -327,9 +307,6 @@ void PointCloudViewer::draw()
 		currentCamDisplay->drawPC(pointTesselation, 1);
 
 	graphDisplay->draw();
-
-	//the camera field of view, the image aspect ratio, the near and far clipping planes
-	//gluPerspective(90, 2, 0.1, 10);
 
 	glPopMatrix();
 

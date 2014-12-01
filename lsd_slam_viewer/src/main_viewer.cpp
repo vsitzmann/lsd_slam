@@ -23,12 +23,12 @@
 #include "boost/thread.hpp"
 #include "settings.h"
 #include "PointCloudViewer.h"
-
 #include "QGLImageWindow.h"
-#include <X11/Xlib.h>
 
+#include <X11/Xlib.h>
 #include <dynamic_reconfigure/server.h>
 #include "lsd_slam_viewer/LSDSLAMViewerParamsConfig.h"
+
 #include <qapplication.h>
 
 
@@ -41,13 +41,13 @@
 #include "rosbag/query.h"
 #include "rosbag/view.h"
 
+#include "opencv2/opencv.hpp"
 
 PointCloudViewer* viewer = 0;
 
 
 void dynConfCb(lsd_slam_viewer::LSDSLAMViewerParamsConfig &config, uint32_t level)
 {
-
 	pointTesselation = config.pointTesselation;
 	lineTesselation = config.lineTesselation;
 
@@ -121,6 +121,17 @@ void rosThreadLoop( int argc, char** argv )
 	exit(1);
 }
 
+void rosSpinLoop( int argc, char** argv )
+{
+	printf("Started ROS SPIN thread\n");
+	ros::spin();
+
+	ros::shutdown();
+
+	printf("Exiting ROS SPIN thread\n");
+
+	exit(1);
+}
 
 void rosFileLoop( int argc, char** argv )
 {
@@ -138,6 +149,8 @@ void rosFileLoop( int argc, char** argv )
 
 	rosbag::View view(bag, rosbag::TopicQuery(topics));
 
+	boost::thread rosSpinThread = boost::thread(rosSpinLoop, argc, argv);
+
 	 //for(rosbag::MessageInstance const m = view.begin(); m < view.end(); ++m)
 	 BOOST_FOREACH(rosbag::MessageInstance const m, view)
 	 {
@@ -149,20 +162,11 @@ void rosFileLoop( int argc, char** argv )
 		 if(m.getTopic() == "/lsd_slam/graph")
 			 graphCb(m.instantiate<lsd_slam_viewer::keyframeGraphMsg>());
 	 }
-
-	ros::spin();
-
-	ros::shutdown();
-
-	printf("Exiting ROS thread\n");
-
-	exit(1);
 }
-
 
 int main( int argc, char** argv )
 {
-
+	//XInitThreads();
 
 	printf("Started QApplication thread\n");
 	// Read command lines arguments.

@@ -19,8 +19,11 @@
 */
 #define GL_GLEXT_PROTOTYPES 1
 
+#include "QGLImageWindow.h"
 #include "KeyFrameGraphDisplay.h"
 #include "KeyFrameDisplay.h"
+#include "PlaneFitting.h"
+
 #include "settings.h"
 #include <sstream>
 #include <fstream>
@@ -29,7 +32,7 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 
-#include "PlaneFitting.h"
+#include "opencv2/opencv.hpp"
 
 #include "ros/package.h"
 
@@ -150,7 +153,22 @@ void KeyFrameGraphDisplay::draw()
 	/**** For plane estimation *****/
 
 	if(planeTracking){
+
 		refreshPlane();
+
+		/*cv::Mat indicators = cv::Mat(640,480,CV_8UC3);
+		indicators.setTo(0);
+
+		int color = rand();
+
+		for(int i = 0; i<640; i++){
+			for(int j = 0; j<480; j++){
+				indicators.at<cv::Vec3b>(i, j) = *(cv::Vec3b*) &(color);
+			}
+		}
+
+		displayImage("regions", indicators,false);
+		waitKey(0);*/
 
 		glDisable(GL_LIGHTING);
 
@@ -202,7 +220,8 @@ void KeyFrameGraphDisplay::addGraphMsg(lsd_slam_viewer::keyframeGraphMsgConstPtr
 	constraints.resize(msg->numConstraints);
 	assert(msg->constraintsData.size() == sizeof(GraphConstraint)*msg->numConstraints);
 	GraphConstraint* constraintsIn = (GraphConstraint*)msg->constraintsData.data();
-	for(int i=0;i<msg->numConstraints;i++)
+
+	for(unsigned int i=0;i<msg->numConstraints;i++)
 	{
 		constraints[i].err = constraintsIn[i].err;
 		constraints[i].from = 0;
