@@ -20,19 +20,17 @@
 #define GL_GLEXT_PROTOTYPES 1
 
 #include "QGLImageWindow.h"
+#include "PlaneFitting.h"
 #include "KeyFrameGraphDisplay.h"
 #include "KeyFrameDisplay.h"
-#include "PlaneFitting.h"
-
 #include "settings.h"
+
 #include <sstream>
 #include <fstream>
 
 #include <GL/glx.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
-
-#include "opencv2/opencv.hpp"
 
 #include "ros/package.h"
 
@@ -46,6 +44,9 @@ KeyFrameGraphDisplay::KeyFrameGraphDisplay()
 
 	totalInlierNumber = 0;
 	keyframeUpdateTracker = 0;
+
+	height = 0;
+	width = 0;
 }
 
 KeyFrameGraphDisplay::~KeyFrameGraphDisplay()
@@ -153,21 +154,11 @@ void KeyFrameGraphDisplay::draw()
 	/**** For plane estimation *****/
 
 	if(planeTracking){
-
 		refreshPlane();
 
-		/*cv::Mat indicators = cv::Mat(640,480,CV_8UC3);
-		indicators.setTo(0);
+		/*cv::Mat indicators = cv::Mat(height,width,CV_8UC3, cv::Scalar::all(0));
 
-		int color = rand();
-
-		for(int i = 0; i<640; i++){
-			for(int j = 0; j<480; j++){
-				indicators.at<cv::Vec3b>(i, j) = *(cv::Vec3b*) &(color);
-			}
-		}
-
-		displayImage("regions", indicators,false);
+		displayImage("Estimated plane", indicators, false);
 		waitKey(0);*/
 
 		glDisable(GL_LIGHTING);
@@ -207,6 +198,9 @@ void KeyFrameGraphDisplay::addMsg(lsd_slam_viewer::keyframeMsgConstPtr msg)
 	//	printf("added new KF, now there are %d!\n", (int)keyframes.size());
 	}
 
+	width = msg->width;
+	height = msg->height;
+
 	if(keyframes.size()==beginPlaneTrackingIndex) beginPlaneTracking();
 
 	keyframesByID[msg->id]->setFrom(msg);
@@ -220,8 +214,7 @@ void KeyFrameGraphDisplay::addGraphMsg(lsd_slam_viewer::keyframeGraphMsgConstPtr
 	constraints.resize(msg->numConstraints);
 	assert(msg->constraintsData.size() == sizeof(GraphConstraint)*msg->numConstraints);
 	GraphConstraint* constraintsIn = (GraphConstraint*)msg->constraintsData.data();
-
-	for(unsigned int i=0;i<msg->numConstraints;i++)
+	for(int i=0;i<msg->numConstraints;i++)
 	{
 		constraints[i].err = constraintsIn[i].err;
 		constraints[i].from = 0;
@@ -276,12 +269,14 @@ void KeyFrameGraphDisplay::beginPlaneTracking(){
 		keyframes2.push_back(it->second);
 	}
 
-	std::vector<Eigen::Vector3f> inliers = PlaneFitting::ransac(keyframes2, 10, 0.04);
+
+	std::vector<Eigen::Vector3f> inliers = PlaneFitting::ransac(keyframes2, 25, 0.01);
 
 	Eigen::MatrixXf mat((int)inliers.size(), 3);
 
 	for(unsigned int i = 0; i<inliers.size(); i++){
 		mat(i, 0) = inliers[i][0];
+
 		mat(i, 1) = inliers[i][1];
 		mat(i, 2) = inliers[i][2];
 	}

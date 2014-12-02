@@ -95,6 +95,9 @@ private:
 	int planeBufferNumPoints;
 	bool planeBufferIdValid;
 
+	int height;
+	int width;
+
 	boost::mutex dataMutex;
 
 };

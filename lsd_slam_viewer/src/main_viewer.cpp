@@ -181,8 +181,8 @@ int main( int argc, char** argv )
 		application.setMainWidget(viewer);
 	#else
 		viewer->setWindowTitle("PointCloud Viewer");
-	#endif
 
+	#endif
 	// Make the viewer window visible on screen.
 	viewer->show();
 
@@ -199,8 +199,6 @@ int main( int argc, char** argv )
 	}
 
 	displayThreadLoop(&application);
-
-	application.exec();
 
 	printf("Shutting down... \n");
 	ros::shutdown();

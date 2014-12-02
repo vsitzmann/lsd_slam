@@ -30,7 +30,7 @@ include(${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)
 gencfg()
 
 
-
+set(GL_LIBRARY GL GLU X11)
 
 
 # Messages & Services
