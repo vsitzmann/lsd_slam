@@ -257,7 +257,7 @@ void KeyFrameGraphDisplay::beginPlaneTracking(){
 		keyframes2.push_back(it->second);
 	}
 
-	std::vector<Eigen::Vector3f> inliers = PlaneFitting::ransac(keyframes2, 10, 0.04);
+	std::vector<Eigen::Vector3f> inliers = PlaneFitting::ransac(keyframes2, 200, 0.01);
 
 	Eigen::MatrixXf mat((int)inliers.size(), 3);
 

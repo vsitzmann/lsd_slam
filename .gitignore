@@ -25,6 +25,8 @@ lsd_slam_viewer/.pydevproject
 lsd_slam_viewer/thirdparty/Sophus/CMakeFiles/
 lsd_slam_viewer/thirdparty/Sophus/Makefile
 lsd_slam_viewer/thirdparty/Sophus/SophusConfig.cmake
+lsd_slam_viewer/.qglviewer.xml
+lsd_slam_viewer/.settings/
 
 cmake_install.cmake
 *.cfgc
