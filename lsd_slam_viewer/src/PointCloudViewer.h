@@ -34,6 +34,9 @@
 
 #include "QGLViewer/keyFrameInterpolator.h"
 
+#include <opencv2/highgui/highgui.hpp>
+#include <cv_bridge/cv_bridge.h>
+
 class QApplication;
 
 class KeyFrameGraphDisplay;
@@ -159,12 +162,9 @@ public:
 
 	void reset();
 
+	void addImageMsg(const sensor_msgs::ImageConstPtr& msg);
 	void addFrameMsg(lsd_slam_viewer::keyframeMsgConstPtr msg);
 	void addGraphMsg(lsd_slam_viewer::keyframeGraphMsgConstPtr msg);
-
-	// camera pose
-	// may be updated by kf-graph.
-	Sophus::Sim3f camToWorld;
 
 protected :
 	virtual void draw();
@@ -184,7 +184,8 @@ private:
 	// displays only current keyframe (which is not yet in the graph).
 	KeyFrameDisplay* currentCamDisplay;
 
-
+	void updateModelViewMatrix(Sophus::Sim3f camToWorld);
+	void updateProjectionMatrix(double fx, double fy, double cx, double cy, double width, double height);
 
 	// meddle mutex
 	boost::mutex meddleMutex;
@@ -226,7 +227,10 @@ private:
 
 	//The projectionMatrix inferred from the camera parameters
 	// fx, fy, cx, cy, width and height
-	Eigen::Matrix<double, 4, 4, Eigen::RowMajor> camProjectionMatrix;
+	Eigen::Matrix <double, 4, 4, Eigen::ColMajor> camProjectionMatrix;
+	Eigen::Matrix <double, 4, 4, Eigen::ColMajor> modelViewMatrix;
+
+	cv::Mat image;
 
 	void remakeAnimation();
 };

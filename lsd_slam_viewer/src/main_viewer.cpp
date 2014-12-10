@@ -17,8 +17,6 @@
 * You should have received a copy of the GNU General Public License
 * along with dvo. If not, see <http://www.gnu.org/licenses/>.
 */
-
-
 #include "ros/ros.h"
 #include "boost/thread.hpp"
 #include "settings.h"
@@ -31,6 +29,8 @@
 
 #include <qapplication.h>
 
+#include <ros/ros.h>
+#include <image_transport/image_transport.h>
 
 #include "lsd_slam_viewer/keyframeGraphMsg.h"
 #include "lsd_slam_viewer/keyframeMsg.h"
@@ -43,7 +43,11 @@
 
 #include "opencv2/opencv.hpp"
 
+#include <ros/ros.h>
+#include <image_transport/image_transport.h>
+
 PointCloudViewer* viewer = 0;
+
 
 
 void dynConfCb(lsd_slam_viewer::LSDSLAMViewerParamsConfig &config, uint32_t level)
@@ -91,6 +95,12 @@ void graphCb(lsd_slam_viewer::keyframeGraphMsgConstPtr msg)
 		viewer->addGraphMsg(msg);
 }
 
+void imageCallback(const sensor_msgs::ImageConstPtr& msg)
+{
+	if(viewer != 0)
+		viewer->addImageMsg(msg);
+}
+
 
 
 void rosThreadLoop( int argc, char** argv )
@@ -111,6 +121,9 @@ void rosThreadLoop( int argc, char** argv )
 	ros::Subscriber liveFrames_sub = nh.subscribe(nh.resolveName("lsd_slam/liveframes"),1, frameCb);
 	ros::Subscriber keyFrames_sub = nh.subscribe(nh.resolveName("lsd_slam/keyframes"),20, frameCb);
 	ros::Subscriber graph_sub       = nh.subscribe(nh.resolveName("lsd_slam/graph"),10, graphCb);
+
+	image_transport::ImageTransport it(nh);
+	image_transport::Subscriber sub = it.subscribe("/image_raw", 1, imageCallback);
 
 	ros::spin();
 
@@ -133,40 +146,50 @@ void rosSpinLoop( int argc, char** argv )
 	exit(1);
 }
 
+
 void rosFileLoop( int argc, char** argv )
 {
 	ros::init(argc, argv, "viewer");
+
 	dynamic_reconfigure::Server<lsd_slam_viewer::LSDSLAMViewerParamsConfig> srv;
+
 	srv.setCallback(dynConfCb);
 
 	rosbag::Bag bag;
+
 	bag.open(argv[1], rosbag::bagmode::Read);
 
 	std::vector<std::string> topics;
+
 	topics.push_back(std::string("/lsd_slam/liveframes"));
 	topics.push_back(std::string("/lsd_slam/keyframes"));
 	topics.push_back(std::string("/lsd_slam/graph"));
 
 	rosbag::View view(bag, rosbag::TopicQuery(topics));
 
-	boost::thread rosSpinThread = boost::thread(rosSpinLoop, argc, argv);
+	//for(rosbag::MessageInstance const m = view.begin(); m < view.end(); ++m)
 
-	 //for(rosbag::MessageInstance const m = view.begin(); m < view.end(); ++m)
-	 BOOST_FOREACH(rosbag::MessageInstance const m, view)
-	 {
+	BOOST_FOREACH(rosbag::MessageInstance const m, view)
 
-		 if(m.getTopic() == "/lsd_slam/liveframes" || m.getTopic() == "/lsd_slam/keyframes")
-			 frameCb(m.instantiate<lsd_slam_viewer::keyframeMsg>());
+	{
+		if(m.getTopic() == "/lsd_slam/liveframes" || m.getTopic() == "/lsd_slam/keyframes")
+			frameCb(m.instantiate<lsd_slam_viewer::keyframeMsg>());
+		if(m.getTopic() == "/lsd_slam/graph")
+			graphCb(m.instantiate<lsd_slam_viewer::keyframeGraphMsg>());
+	}
 
+	ros::spin();
 
-		 if(m.getTopic() == "/lsd_slam/graph")
-			 graphCb(m.instantiate<lsd_slam_viewer::keyframeGraphMsg>());
-	 }
+	ros::shutdown();
+
+	printf("Exiting ROS thread\n");
+
+	exit(1);
 }
 
 int main( int argc, char** argv )
 {
-	//XInitThreads();
+
 
 	printf("Started QApplication thread\n");
 	// Read command lines arguments.

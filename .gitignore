@@ -12,6 +12,7 @@ lsd_slam_core/thirdparty/Sophus/Makefile
 lsd_slam_core/thirdparty/Sophus/SophusConfig.cmake
 lsd_slam_core/thirdparty/openFabMap/CMakeFiles/
 lsd_slam_core/thirdparty/openFabMap/Makefile
+lsd_slam_core/.settings/*
 
 lsd_slam_viewer/bin/
 lsd_slam_viewer/build/
@@ -29,6 +30,8 @@ lsd_slam_viewer/thirdparty/Sophus/SophusConfig.cmake
 lsd_slam_viewer/.settings/*
 lsd_slam_viewer/.qglviewer.xml
 .qglviewer.xml
+
+
 
 
 cmake_install.cmake

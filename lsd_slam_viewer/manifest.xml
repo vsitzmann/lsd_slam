@@ -13,6 +13,7 @@
   <depend package="sensor_msgs"/>
   <depend package="roslib"/>
   <depend package="rosbag"/>
+  <depend package="image_transport"/>
 </package>
 
 
