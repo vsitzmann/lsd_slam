@@ -151,38 +151,6 @@ void KeyFrameGraphDisplay::draw()
 		glEnd();
 	}
 
-	/**** For plane estimation *****/
-
-	if(planeTracking){
-		refreshPlane();
-
-		/*cv::Mat indicators = cv::Mat(height,width,CV_8UC3, cv::Scalar::all(0));
-
-		displayImage("Estimated plane", indicators, false);
-		waitKey(0);*/
-
-		glDisable(GL_LIGHTING);
-
-		glPushMatrix();
-
-				glLineWidth(1.0);
-
-				glBindBuffer(GL_ARRAY_BUFFER, planeBufferId);
-
-				glVertexPointer(3, GL_FLOAT, sizeof(MyVertex), 0);
-				glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(MyVertex), (const void*) (3*sizeof(float)));
-
-				glEnableClientState(GL_VERTEX_ARRAY);
-				glEnableClientState(GL_COLOR_ARRAY);
-
-				glDrawArrays(GL_LINE_LOOP, 0, planeBufferNumPoints);
-
-				glDisableClientState(GL_COLOR_ARRAY);
-				glDisableClientState(GL_VERTEX_ARRAY);
-
-			glPopMatrix();
-	}
-
 	dataMutex.unlock();
 }
 
@@ -200,8 +168,6 @@ void KeyFrameGraphDisplay::addMsg(lsd_slam_viewer::keyframeMsgConstPtr msg)
 
 	width = msg->width;
 	height = msg->height;
-
-	if(keyframes.size()==beginPlaneTrackingIndex) beginPlaneTracking();
 
 	keyframesByID[msg->id]->setFrom(msg);
 	dataMutex.unlock();

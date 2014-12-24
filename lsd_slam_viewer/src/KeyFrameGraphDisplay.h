@@ -71,6 +71,8 @@ public:
 
 	bool flushPointcloud;
 	bool printNumbers;
+
+	std::vector<KeyFrameDisplay*> keyframes;
 private:
 	/***** Functions ******/
 	void refreshPlane();
@@ -78,7 +80,6 @@ private:
 
 	/***** Variables *****/
 	std::map<int, KeyFrameDisplay*> keyframesByID;
-	std::vector<KeyFrameDisplay*> keyframes;
 	std::vector<GraphConstraintPt> constraints;
 
 	Eigen::Matrix3f covarianceMatrix;

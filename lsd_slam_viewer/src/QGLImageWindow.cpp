@@ -43,7 +43,7 @@ boost::mutex keyPressMutex;
 boost::condition_variable keyPressCondition;
 int lastKey=0;
 
-void displayThreadLoop(QApplication* app)
+void displayThreadLoop(QApplication* app, PointCloudViewer * viewer)
 {
 	printf("started image display thread!\n");
 	boost::unique_lock<boost::mutex> lock(openCVdisplayMutex);
@@ -72,7 +72,7 @@ void displayThreadLoop(QApplication* app)
 
 			if(!found)
 			{
-				GLImageWindow* window = new GLImageWindow(displayQueue.back().name);
+				GLImageWindow* window = new GLImageWindow(displayQueue.back().name, 0, viewer);
 				openWindows.push_back(window);
 				window->loadImage(displayQueue.back().img, displayQueue.back().autoSize);
 				window->show();
@@ -136,11 +136,7 @@ void closeAllWindows()
 
 
 
-
-
-
-
-GLImageWindow::GLImageWindow(std::string name, QWidget *parent) :
+GLImageWindow::GLImageWindow(std::string name, QWidget *parent, PointCloudViewer * viewer) :
     QGLWidget(parent)
 {
     setWindowTitle(tr(name.c_str()));
@@ -155,6 +151,9 @@ GLImageWindow::GLImageWindow(std::string name, QWidget *parent) :
     glViewport(0,0,640,480);
 
     this->name = name;
+    this->planeEstimator = viewer->planeEstimator;
+    this->graphDisplay = viewer->graphDisplay;
+    this->viewer = viewer;
 
 }
 
@@ -165,29 +164,37 @@ GLImageWindow::~GLImageWindow()
 
 void GLImageWindow::initializeGL()
 {
-    glDisable(GL_DEPTH_TEST); //disable for 2D painting
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
+
 }
 
 void GLImageWindow::paintGL()
 {
     makeCurrent();
-    glViewport(0,height()-height_img,width_img,height_img);
-
-    glClear(GL_COLOR_BUFFER_BIT);
-    glLoadIdentity();
-    glPushMatrix();
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
 	if(image != 0)
 	{
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+
 		glRasterPos2f( -1,1);
 		glPixelZoom( width() / (float)width_img, -height()/(float)height_img );
 		glDrawPixels( width_img, height_img, GL_BGR, GL_UNSIGNED_BYTE, image);
 	}
 
+	glPushMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glLoadMatrixd(viewer->modelViewMatrix.data());
+		glMatrixMode(GL_PROJECTION);
+		glLoadMatrixd(viewer->camProjectionMatrix.data());
+
+		planeEstimator->draw();
 	glPopMatrix();
+
 	glFlush();
+
 }
 
 

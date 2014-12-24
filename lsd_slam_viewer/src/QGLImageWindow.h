@@ -2,6 +2,14 @@
 #include <opencv2/core/core.hpp>
 #include <QtOpenGL>
 
+#include "KeyFrameGraphDisplay.h"
+#include "PlaneEstimator.h"
+#include "PointCloudViewer.h"
+
+class KeyFrameGraphDisplay;
+class PlaneEstimator;
+class PointCloudViewer;
+
 struct DisplayImageObect
 {
 	cv::Mat img;
@@ -13,7 +21,7 @@ struct DisplayImageObect
 class GLImageWindow : public QGLWidget
 {
     public:
-		GLImageWindow(std::string name, QWidget *parent=0 );
+		GLImageWindow(std::string name, QWidget *parent=0 , PointCloudViewer * viewer = 0);
        	~GLImageWindow();
     protected:
         void initializeGL();
@@ -22,6 +30,7 @@ class GLImageWindow : public QGLWidget
         void keyPressEvent(QKeyEvent *ke);
     public:
         void loadImage(cv::Mat m, bool resize=false);
+        void setPointCloudViewerPointer(PointCloudViewer * viewer);
 
         std::string name;
     private:
@@ -30,6 +39,9 @@ class GLImageWindow : public QGLWidget
 
         unsigned char* image;
     private:
+        PlaneEstimator * planeEstimator;
+        KeyFrameGraphDisplay * graphDisplay;
+        PointCloudViewer * viewer;
 
         int width_img, height_img;
 
@@ -41,7 +53,7 @@ int waitKey(int milliseconds);
 void closeAllWindows();
 
 
-void displayThreadLoop(QApplication* app=0);
+void displayThreadLoop(QApplication* app=0, PointCloudViewer * viewer = 0);
 
 
 

@@ -17,11 +17,12 @@
 * You should have received a copy of the GNU General Public License
 * along with dvo. If not, see <http://www.gnu.org/licenses/>.
 */
+#include "QGLImageWindow.h"
+
 #include "ros/ros.h"
 #include "boost/thread.hpp"
 #include "settings.h"
 #include "PointCloudViewer.h"
-#include "QGLImageWindow.h"
 
 #include <X11/Xlib.h>
 #include <dynamic_reconfigure/server.h>
@@ -97,8 +98,10 @@ void graphCb(lsd_slam_viewer::keyframeGraphMsgConstPtr msg)
 
 void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-	if(viewer != 0)
-		viewer->addImageMsg(msg);
+	cv::Mat image =  cv_bridge::toCvShare(msg, "rgb8")->image;
+
+	displayImage("Video Stream", image, false);
+
 }
 
 
@@ -221,7 +224,7 @@ int main( int argc, char** argv )
 		rosThread = boost::thread(rosThreadLoop, argc, argv);
 	}
 
-	displayThreadLoop(&application);
+	displayThreadLoop(&application, viewer);
 
 	printf("Shutting down... \n");
 	ros::shutdown();

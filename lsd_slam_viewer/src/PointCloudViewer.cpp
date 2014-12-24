@@ -25,6 +25,7 @@
 #include "PointCloudViewer.h"
 #include "KeyFrameDisplay.h"
 #include "KeyFrameGraphDisplay.h"
+#include "PlaneEstimator.h"
 
 #include "qfiledialog.h"
 #include "qcoreapplication.h"
@@ -61,6 +62,7 @@ PointCloudViewer::PointCloudViewer() {
 
 	currentCamDisplay = 0;
 	graphDisplay = 0;
+	planeEstimator = 0;
 
 	for (int i = 0; i < 10; i++) {
 		KFexists[i] = 0;
@@ -88,6 +90,7 @@ void PointCloudViewer::reset() {
 
 	currentCamDisplay = new KeyFrameDisplay();
 	graphDisplay = new KeyFrameGraphDisplay();
+	planeEstimator = new PlaneEstimator(graphDisplay);
 
 	KFcurrent = 0;
 	KFLastPCSeq = -1;
@@ -272,6 +275,8 @@ void PointCloudViewer::draw() {
 		currentCamDisplay->drawPC(pointTesselation, 1);
 
 	graphDisplay->draw();
+
+	planeEstimator->draw();
 
 	glPopMatrix();
 

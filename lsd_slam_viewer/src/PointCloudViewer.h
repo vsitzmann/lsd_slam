@@ -42,6 +42,7 @@ class QApplication;
 class KeyFrameGraphDisplay;
 class CameraDisplay;
 class KeyFrameDisplay;
+class PlaneEstimator;
 
 #include "settings.h"
 
@@ -166,6 +167,16 @@ public:
 	void addFrameMsg(lsd_slam_viewer::keyframeMsgConstPtr msg);
 	void addGraphMsg(lsd_slam_viewer::keyframeGraphMsgConstPtr msg);
 
+
+	// displays kf-graph
+	KeyFrameGraphDisplay* graphDisplay;
+	PlaneEstimator * planeEstimator;
+
+	//The projectionMatrix inferred from the camera parameters
+	// fx, fy, cx, cy, width and height
+	Eigen::Matrix <double, 4, 4, Eigen::ColMajor> camProjectionMatrix;
+	Eigen::Matrix <double, 4, 4, Eigen::ColMajor> modelViewMatrix;
+
 protected :
 	virtual void draw();
 	virtual void init();
@@ -178,11 +189,9 @@ protected :
 
 private:
 
-	// displays kf-graph
-	KeyFrameGraphDisplay* graphDisplay;
-
 	// displays only current keyframe (which is not yet in the graph).
 	KeyFrameDisplay* currentCamDisplay;
+
 
 	void updateModelViewMatrix(Sophus::Sim3f camToWorld);
 	void updateProjectionMatrix(double fx, double fy, double cx, double cy, double width, double height);
@@ -224,11 +233,6 @@ private:
 	int animationPlaybackID;
 
 	double lastAnimTime;
-
-	//The projectionMatrix inferred from the camera parameters
-	// fx, fy, cx, cy, width and height
-	Eigen::Matrix <double, 4, 4, Eigen::ColMajor> camProjectionMatrix;
-	Eigen::Matrix <double, 4, 4, Eigen::ColMajor> modelViewMatrix;
 
 	cv::Mat image;
 
