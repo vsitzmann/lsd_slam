@@ -163,7 +163,6 @@ public:
 
 	void reset();
 
-	void addImageMsg(const sensor_msgs::ImageConstPtr& msg);
 	void addFrameMsg(lsd_slam_viewer::keyframeMsgConstPtr msg);
 	void addGraphMsg(lsd_slam_viewer::keyframeGraphMsgConstPtr msg);
 

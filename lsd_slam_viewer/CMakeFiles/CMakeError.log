@@ -1,0 +1,149 @@
+Determining if the pthread_create exist failed with the following output:
+Change Dir: /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/make "cmTryCompileExec1259743552/fast"
+/usr/bin/make -f CMakeFiles/cmTryCompileExec1259743552.dir/build.make CMakeFiles/cmTryCompileExec1259743552.dir/build
+make[1]: Entering directory `/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec1259743552.dir/CheckSymbolExists.c.o
+/usr/bin/cc    -o CMakeFiles/cmTryCompileExec1259743552.dir/CheckSymbolExists.c.o   -c /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+Linking C executable cmTryCompileExec1259743552
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTryCompileExec1259743552.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTryCompileExec1259743552.dir/CheckSymbolExists.c.o  -o cmTryCompileExec1259743552 -rdynamic 
+CMakeFiles/cmTryCompileExec1259743552.dir/CheckSymbolExists.c.o: In function `main':
+CheckSymbolExists.c:(.text+0x16): undefined reference to `pthread_create'
+collect2: error: ld returned 1 exit status
+make[1]: Leaving directory `/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp'
+make[1]: *** [cmTryCompileExec1259743552] Error 1
+make: *** [cmTryCompileExec1259743552/fast] Error 2
+
+File /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <pthread.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_create
+  return ((int*)(&pthread_create))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/make "cmTryCompileExec3362075178/fast"
+/usr/bin/make -f CMakeFiles/cmTryCompileExec3362075178.dir/build.make CMakeFiles/cmTryCompileExec3362075178.dir/build
+make[1]: Entering directory `/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec3362075178.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create   -o CMakeFiles/cmTryCompileExec3362075178.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-2.8/Modules/CheckFunctionExists.c
+Linking C executable cmTryCompileExec3362075178
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTryCompileExec3362075178.dir/link.txt --verbose=1
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create    CMakeFiles/cmTryCompileExec3362075178.dir/CheckFunctionExists.c.o  -o cmTryCompileExec3362075178 -rdynamic -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+collect2: error: ld returned 1 exit status
+make[1]: *** [cmTryCompileExec3362075178] Error 1
+make[1]: Leaving directory `/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp'
+make: *** [cmTryCompileExec3362075178/fast] Error 2
+
+
+Determining if the Q_WS_WIN exist failed with the following output:
+Change Dir: /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/make "cmTryCompileExec2380003662/fast"
+/usr/bin/make -f CMakeFiles/cmTryCompileExec2380003662.dir/build.make CMakeFiles/cmTryCompileExec2380003662.dir/build
+make[1]: Entering directory `/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building CXX object CMakeFiles/cmTryCompileExec2380003662.dir/CheckSymbolExists.cxx.o
+/usr/bin/c++    -I/usr/include/qt4    -o CMakeFiles/cmTryCompileExec2380003662.dir/CheckSymbolExists.cxx.o -c /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx
+/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx: In function ‘int main(int, char**)’:
+/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx:8:19: error: ‘Q_WS_WIN’ was not declared in this scope
+   return ((int*)(&Q_WS_WIN))[argc];
+                   ^
+make[1]: *** [CMakeFiles/cmTryCompileExec2380003662.dir/CheckSymbolExists.cxx.o] Error 1
+make[1]: Leaving directory `/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp'
+make: *** [cmTryCompileExec2380003662/fast] Error 2
+
+File /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx:
+/* */
+#include <QtCore/qglobal.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef Q_WS_WIN
+  return ((int*)(&Q_WS_WIN))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the Q_WS_QWS exist failed with the following output:
+Change Dir: /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/make "cmTryCompileExec2111034876/fast"
+/usr/bin/make -f CMakeFiles/cmTryCompileExec2111034876.dir/build.make CMakeFiles/cmTryCompileExec2111034876.dir/build
+make[1]: Entering directory `/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building CXX object CMakeFiles/cmTryCompileExec2111034876.dir/CheckSymbolExists.cxx.o
+/usr/bin/c++    -I/usr/include/qt4    -o CMakeFiles/cmTryCompileExec2111034876.dir/CheckSymbolExists.cxx.o -c /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx
+/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx: In function ‘int main(int, char**)’:
+/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx:8:19: error: ‘Q_WS_QWS’ was not declared in this scope
+   return ((int*)(&Q_WS_QWS))[argc];
+                   ^
+make[1]: *** [CMakeFiles/cmTryCompileExec2111034876.dir/CheckSymbolExists.cxx.o] Error 1
+make[1]: Leaving directory `/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp'
+make: *** [cmTryCompileExec2111034876/fast] Error 2
+
+File /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx:
+/* */
+#include <QtCore/qglobal.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef Q_WS_QWS
+  return ((int*)(&Q_WS_QWS))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the Q_WS_MAC exist failed with the following output:
+Change Dir: /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/make "cmTryCompileExec4179459310/fast"
+/usr/bin/make -f CMakeFiles/cmTryCompileExec4179459310.dir/build.make CMakeFiles/cmTryCompileExec4179459310.dir/build
+make[1]: Entering directory `/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building CXX object CMakeFiles/cmTryCompileExec4179459310.dir/CheckSymbolExists.cxx.o
+/usr/bin/c++    -I/usr/include/qt4    -o CMakeFiles/cmTryCompileExec4179459310.dir/CheckSymbolExists.cxx.o -c /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx
+/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx: In function ‘int main(int, char**)’:
+/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx:8:19: error: ‘Q_WS_MAC’ was not declared in this scope
+   return ((int*)(&Q_WS_MAC))[argc];
+                   ^
+make[1]: Leaving directory `/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp'
+make[1]: *** [CMakeFiles/cmTryCompileExec4179459310.dir/CheckSymbolExists.cxx.o] Error 1
+make: *** [cmTryCompileExec4179459310/fast] Error 2
+
+File /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx:
+/* */
+#include <QtCore/qglobal.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef Q_WS_MAC
+  return ((int*)(&Q_WS_MAC))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+

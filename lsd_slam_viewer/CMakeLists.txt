@@ -52,6 +52,7 @@ set(SOURCE_FILES
   src/PlaneFitting.cpp
   src/QGLImageWindow.cpp
   src/PlaneEstimator.cpp
+  src/Car.cpp
 )
 
 set(HEADER_FILES     
@@ -62,6 +63,7 @@ set(HEADER_FILES
   src/PlaneFitting.h
   src/QGLImageWindow.h
   src/PlaneEstimator.h
+  src/Car.h
 )
 
 include_directories(

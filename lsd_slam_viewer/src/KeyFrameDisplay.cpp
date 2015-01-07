@@ -136,6 +136,7 @@ void KeyFrameDisplay::refreshPC()
 
 	// make data
 	MyVertex* tmpBuffer = new MyVertex[width*height];
+	keyframePointcloud.clear();
 
 	my_scaledTH =scaledDepthVarTH;
 	my_absTH = absDepthVarTH;
@@ -209,66 +210,13 @@ void KeyFrameDisplay::refreshPC()
 	glBufferData(GL_ARRAY_BUFFER, sizeof(MyVertex) * vertexBufferNumPoints, tmpBuffer, GL_STATIC_DRAW);
 	vertexBufferIdValid = true;
 
-
-
 	if(!keepInMemory)
 	{
 		delete[] originalInput;
 		originalInput = 0;
 	}
 
-
-
-
 	delete[] tmpBuffer;
-}
-
-void KeyFrameDisplay::calcKeyframeCovMatrix(Eigen::Matrix3f &covarianceMatrix, Eigen::Vector3f &keyframeCenter, const Eigen::Vector3f &center, const Eigen::Vector3f &tangent, const Eigen::Vector3f &bitangent){
-	if(debugMode)
-			std::cerr<<__PRETTY_FUNCTION__<<std::endl;
-
-	if(keyframePointcloud.empty()) return;
-
-	std::vector<Eigen::Vector3f> inliers;
- 	Eigen::Vector4f planeParams;
-	Eigen::Matrix3f newCov;
-	double dis = 0;
-
-	Eigen::Vector3f P1, P2, P3;
-
-	P1 = center;
-	P2 = center + tangent;
-	P3 = center + bitangent;
-
-	planeParams = PlaneFitting::calcPlaneParams(P1, P2, P3);
-
-	for(unsigned int i = 0; i<keyframePointcloud.size(); i++){
-		dis = PlaneFitting::calcPlanePointDis(planeParams, keyframePointcloud[i]);
-
-		if(dis < 0.05){
-			inliers.push_back(keyframePointcloud[i]);
-		}
-	}
-
-	if(inliers.empty()) return;
-
-	Eigen::MatrixXf mat((int)inliers.size(), 3);
-
-	for(unsigned int i = 0; i<inliers.size(); i++){
-		mat(i, 0) = inliers[i][0];
-		mat(i, 1) = inliers[i][1];
-		mat(i, 2) = inliers[i][2];
-	}
-
-	/******* Calculate the new covariance matrix, which is the average of the old
-	 matrix weighted with all previous points and the current keyframe covariance matrix
-	 weighted with the number of points in the current keyframe.*****/
-
-
-	keyframeCenter = mat.colwise().mean().transpose();
-
-	Eigen::MatrixXf centered = mat.rowwise() - keyframeCenter.transpose();
-	covarianceMatrix = (centered.adjoint() * centered) / float(mat.rows());
 }
 
 void KeyFrameDisplay::drawCam(float lineWidth, float* color)

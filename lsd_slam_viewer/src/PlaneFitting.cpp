@@ -163,19 +163,3 @@ void PlaneFitting::makeInlierPC(std::vector<Eigen::Vector3f> inliers, MyVertex *
 }
 
 
-
-Eigen::Matrix3f PlaneFitting::pcaPlaneFitting(Eigen::MatrixXf &mat, Eigen::Vector3f &tangent, Eigen::Vector3f &bitangent, Eigen::Vector3f &center){
-	center = mat.colwise().mean().transpose();
-
-	Eigen::MatrixXf centered = mat.rowwise() - center.transpose();
-	Eigen::MatrixXf cov = (centered.adjoint() * centered) / float(mat.rows());
-
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(cov);
-
-	tangent =  eig.eigenvectors().col(2);
-	bitangent =  eig.eigenvectors().col(1);
-
-	return cov;
-}
-
-

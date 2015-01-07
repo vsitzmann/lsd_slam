@@ -172,16 +172,10 @@ void PointCloudViewer::updateProjectionMatrix(double fx, double fy, double cx, d
 	camProjectionMatrix(1, 1) = 2 * fy / height;
 	camProjectionMatrix(1, 2) = -(height-2*cy)/height;
 
-	camProjectionMatrix(2, 2) = 1;//(camera()->zFar() + camera()->zNear())/(camera()->zFar()-camera()->zNear());
-	camProjectionMatrix(2, 3) = 0;//(camera()->zFar() * camera()->zNear())/(camera()->zFar()-camera()->zNear());
+	camProjectionMatrix(2, 2) = 1;
+	camProjectionMatrix(2, 3) = 0;
 	camProjectionMatrix(3, 2) = -1;
 
-}
-
-void PointCloudViewer::addImageMsg(const sensor_msgs::ImageConstPtr& msg){
-	image =  cv_bridge::toCvShare(msg, "rgb8")->image;
-
-	//displayImage("Video Stream", image, false);
 }
 
 void PointCloudViewer::addGraphMsg(
@@ -276,7 +270,7 @@ void PointCloudViewer::draw() {
 
 	graphDisplay->draw();
 
-	planeEstimator->draw();
+//	planeEstimator->draw();
 
 	glPopMatrix();
 
@@ -436,6 +430,10 @@ void PointCloudViewer::keyPressEvent(QKeyEvent *e) {
 
 	case Qt::Key_W:
 		graphDisplay->printNumbers = true;
+		break;
+
+	case Qt::Key_Q:
+		planeEstimator->beginPlaneTracking();
 		break;
 
 	default:

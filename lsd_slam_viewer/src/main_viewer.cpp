@@ -101,7 +101,6 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 	cv::Mat image =  cv_bridge::toCvShare(msg, "rgb8")->image;
 
 	displayImage("Video Stream", image, false);
-
 }
 
 

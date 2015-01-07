@@ -154,12 +154,14 @@ GLImageWindow::GLImageWindow(std::string name, QWidget *parent, PointCloudViewer
     this->planeEstimator = viewer->planeEstimator;
     this->graphDisplay = viewer->graphDisplay;
     this->viewer = viewer;
+    this->car = 0;
 
 }
 
 GLImageWindow::~GLImageWindow()
 {
     if(image != 0) delete[] image;
+    delete planeEstimator;
 }
 
 void GLImageWindow::initializeGL()
@@ -182,6 +184,10 @@ void GLImageWindow::paintGL()
 		glRasterPos2f( -1,1);
 		glPixelZoom( width() / (float)width_img, -height()/(float)height_img );
 		glDrawPixels( width_img, height_img, GL_BGR, GL_UNSIGNED_BYTE, image);
+	}
+
+	if(car != 0){
+		car->draw();
 	}
 
 	glPushMatrix();
@@ -253,7 +259,24 @@ void GLImageWindow::loadImage(cv::Mat m, bool resize)
 
 void GLImageWindow::keyPressEvent(QKeyEvent *ke)
 {
+	switch(ke->key()){
+		case Qt::Key_Q:
+			planeEstimator->beginPlaneTracking();
+			break;
+		case Qt::Key_A:
+			initARDemo();
+			break;
+	}
+
 	boost::unique_lock<boost::mutex> lock(keyPressMutex);
 	lastKey = ke->key();
 	keyPressCondition.notify_one();
+}
+
+void GLImageWindow::initARDemo(){
+//	Eigen::Matrix4f initialCarPose = Eigen::Matrix4f::Identity();
+//	initialCarPose.rightCols(3) = this->planeEstimator->center;
+//	Eigen::Vector4f upVector = this->planeEstimator->bitangent.cross(this->planeEstimator->tangent);
+//
+//	this->car = new Car(initialCarPose, upVector);
 }

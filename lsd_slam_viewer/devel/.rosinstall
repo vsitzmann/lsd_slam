@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/devel/setup.sh

@@ -503,6 +503,30 @@ gtest_main/fast:
 	$(MAKE) -f gtest/CMakeFiles/gtest_main.dir/build.make gtest/CMakeFiles/gtest_main.dir/build
 .PHONY : gtest_main/fast
 
+src/Car.o: src/Car.cpp.o
+.PHONY : src/Car.o
+
+# target to build an object file
+src/Car.cpp.o:
+	$(MAKE) -f CMakeFiles/viewer.dir/build.make CMakeFiles/viewer.dir/src/Car.cpp.o
+.PHONY : src/Car.cpp.o
+
+src/Car.i: src/Car.cpp.i
+.PHONY : src/Car.i
+
+# target to preprocess a source file
+src/Car.cpp.i:
+	$(MAKE) -f CMakeFiles/viewer.dir/build.make CMakeFiles/viewer.dir/src/Car.cpp.i
+.PHONY : src/Car.cpp.i
+
+src/Car.s: src/Car.cpp.s
+.PHONY : src/Car.s
+
+# target to generate assembly for a file
+src/Car.cpp.s:
+	$(MAKE) -f CMakeFiles/viewer.dir/build.make CMakeFiles/viewer.dir/src/Car.cpp.s
+.PHONY : src/Car.cpp.s
+
 src/KeyFrameDisplay.o: src/KeyFrameDisplay.cpp.o
 .PHONY : src/KeyFrameDisplay.o
 
@@ -759,6 +783,9 @@ help:
 	@echo "... viewer"
 	@echo "... gtest"
 	@echo "... gtest_main"
+	@echo "... src/Car.o"
+	@echo "... src/Car.i"
+	@echo "... src/Car.s"
 	@echo "... src/KeyFrameDisplay.o"
 	@echo "... src/KeyFrameDisplay.i"
 	@echo "... src/KeyFrameDisplay.s"

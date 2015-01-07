@@ -28,6 +28,10 @@ public:
 
 	void beginPlaneTracking();
 
+	Eigen::Vector3f center;
+	Eigen::Vector3f tangent;
+	Eigen::Vector3f bitangent;
+
 private:
 	/***** Functions ******/
 	void refreshPlane();
@@ -35,9 +39,6 @@ private:
 
 	/**** Variables ****/
 	Eigen::Matrix3f covarianceMatrix;
-	Eigen::Vector3f center;
-	Eigen::Vector3f tangent;
-	Eigen::Vector3f bitangent;
 
 	bool planeTracking;
 

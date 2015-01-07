@@ -57,7 +57,6 @@ public:
 	void drawCam(float lineWidth = 1, float* color = 0);
 	void drawPC(float pointSize = 1, float alpha = 1);
 	void refreshPC();
-	void calcKeyframeCovMatrix(Eigen::Matrix3f &covarianceMatrix, Eigen::Vector3f &keyframeCenter, const Eigen::Vector3f &center, const Eigen::Vector3f &tangent, const Eigen::Vector3f &bitangent);
 
 	int flushPC(std::ofstream* f);
 

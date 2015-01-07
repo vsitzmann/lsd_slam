@@ -6,6 +6,8 @@
 #include "PlaneEstimator.h"
 #include "PointCloudViewer.h"
 
+#include "Car.h"
+
 class KeyFrameGraphDisplay;
 class PlaneEstimator;
 class PointCloudViewer;
@@ -36,15 +38,15 @@ class GLImageWindow : public QGLWidget
     private:
 
         void showTitlePage();
-
-        unsigned char* image;
+        void initARDemo();
     private:
         PlaneEstimator * planeEstimator;
         KeyFrameGraphDisplay * graphDisplay;
         PointCloudViewer * viewer;
 
         int width_img, height_img;
-
+        unsigned char* image;
+        Car * car;
 
     };
 
