@@ -21,6 +21,7 @@
 #include "QGLImageWindow.h"
 
 #include <opencv2/opencv.hpp>
+#include <Eigen/Geometry>
 
 #include <string>
 #include <unordered_set>
@@ -156,6 +157,10 @@ GLImageWindow::GLImageWindow(std::string name, QWidget *parent, PointCloudViewer
     this->viewer = viewer;
     this->car = 0;
 
+    QTimer *timer = new QTimer(this);
+    connect(timer, SIGNAL(timeout()), this, SLOT(update()));
+    timer->start(10);
+
 }
 
 GLImageWindow::~GLImageWindow()
@@ -177,26 +182,36 @@ void GLImageWindow::paintGL()
 	if(image != 0)
 	{
 		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
 
-		glRasterPos2f( -1,1);
-		glPixelZoom( width() / (float)width_img, -height()/(float)height_img );
-		glDrawPixels( width_img, height_img, GL_BGR, GL_UNSIGNED_BYTE, image);
+		glPushMatrix();
+			glLoadIdentity();
+
+			glMatrixMode(GL_PROJECTION);
+
+			glPushMatrix();
+				glLoadIdentity();
+
+				glRasterPos2f( -1,1);
+				glPixelZoom( width() / (float)width_img, -height()/(float)height_img );
+				glDrawPixels( width_img, height_img, GL_BGR, GL_UNSIGNED_BYTE, image);
+			glPopMatrix();
+		glPopMatrix();
 	}
 
-	if(car != 0){
-		car->draw();
-	}
-
+	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
-		glMatrixMode(GL_MODELVIEW);
+
 		glLoadMatrixd(viewer->modelViewMatrix.data());
 		glMatrixMode(GL_PROJECTION);
-		glLoadMatrixd(viewer->camProjectionMatrix.data());
+		glPushMatrix();
 
-		planeEstimator->draw();
+			glLoadMatrixd(viewer->camProjectionMatrix.data());
+
+			if(car != 0) car->draw();
+
+			planeEstimator->draw();
+
+		glPopMatrix();
 	glPopMatrix();
 
 	glFlush();
@@ -266,6 +281,9 @@ void GLImageWindow::keyPressEvent(QKeyEvent *ke)
 		case Qt::Key_A:
 			initARDemo();
 			break;
+		case Qt::Key_Up:
+			if(car) car->moveStraight(1);
+			break;
 	}
 
 	boost::unique_lock<boost::mutex> lock(keyPressMutex);
@@ -274,9 +292,14 @@ void GLImageWindow::keyPressEvent(QKeyEvent *ke)
 }
 
 void GLImageWindow::initARDemo(){
-//	Eigen::Matrix4f initialCarPose = Eigen::Matrix4f::Identity();
-//	initialCarPose.rightCols(3) = this->planeEstimator->center;
-//	Eigen::Vector4f upVector = this->planeEstimator->bitangent.cross(this->planeEstimator->tangent);
-//
-//	this->car = new Car(initialCarPose, upVector);
+	if(debugMode)
+		std::cerr<<__PRETTY_FUNCTION__<<std::endl;
+
+	Eigen::Matrix4f initialCarPose = Eigen::Matrix4f::Identity();
+	initialCarPose.rightCols(1).topRows(3) = this->planeEstimator->center;
+
+	Eigen::Vector4f upVector = Eigen::Vector4f::Zero();
+	upVector.topRows(3) = this->planeEstimator->bitangent.cross(this->planeEstimator->tangent);
+
+	this->car = new Car(initialCarPose, upVector,  planeEstimator->tangent.norm()/10);
 }

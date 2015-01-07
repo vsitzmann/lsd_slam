@@ -14,7 +14,7 @@
 
 class Car {
 public:
-	Car(Eigen::Matrix4f initialPose, Eigen::Vector4f upVector);
+	Car(Eigen::Matrix4f initialPose, Eigen::Vector4f upVector, float sizeFactor);
 	virtual ~Car();
 
 	void draw();
@@ -22,9 +22,8 @@ public:
 	void rotate(int leftRight);
 
 private:
-	Eigen::Matrix4f currentPose;
+	Eigen::Matrix <float, 4, 4, Eigen::ColMajor> currentPose;
 	Eigen::Vector4f upVector;
-	Eigen::Vector4f direction;
 	Eigen::Vector4f baseRotMatrix;
 	float rotAngle;
 	unsigned int vertexBufferID;

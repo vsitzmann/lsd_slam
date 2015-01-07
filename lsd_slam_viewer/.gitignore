@@ -1,0 +1,5 @@
+CMakeFiles/*
+bin/*
+build/*
+Makefile
+.qglviewer.xml

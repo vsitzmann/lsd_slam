@@ -13,11 +13,12 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 
+#include <iostream>
 #include <cmath>
 
 #include "settings.h"
 
-static const float verticeArray [] = {
+float verticeArray [] = {
     -1.0f,-1.0f,-1.0f, // triangle 1 : begin
     -1.0f,-1.0f, 1.0f,
     -1.0f, 1.0f, 1.0f, // triangle 1 : end
@@ -56,7 +57,7 @@ static const float verticeArray [] = {
     1.0f,-1.0f, 1.0f
 };
 
-Car::Car(Eigen::Matrix4f initialPose, Eigen::Vector4f upVector) {
+Car::Car(Eigen::Matrix4f initialPose, Eigen::Vector4f upVector, float sizeFactor) {
 	// TODO Auto-generated constructor stub
 
 	this->rotAngle = 0;
@@ -66,8 +67,10 @@ Car::Car(Eigen::Matrix4f initialPose, Eigen::Vector4f upVector) {
 	vertexBufferID = 0;
 
 	this->rotAngle = (10/360)*2*M_PI;
-	this->direction = Eigen::Vector4f (1,1,1,1);
-	direction.topRows(3) = Eigen::Vector3f (1,1,1) * initialPose.topLeftCorner(3, 3);
+
+	for(int i = 0; i<36*3; i++){
+		verticeArray[i] *= sizeFactor;
+	}
 
 	glGenBuffers(1, &vertexBufferID);
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);         // for vertex coordinates
@@ -79,7 +82,13 @@ Car::~Car() {
 }
 
 void Car::draw(){
+	if(debugMode)
+		std::cerr<<__PRETTY_FUNCTION__<<std::endl;
+
+	glMatrixMode(GL_MODELVIEW);
+
 	glPushMatrix();
+		glMultMatrixf(currentPose.data());
 
 	// 1rst attribute buffer : vertices
 		glEnableVertexAttribArray(0);
@@ -94,7 +103,7 @@ void Car::draw(){
 		);
 
 		// Draw the triangle !
-		glDrawArrays(GL_TRIANGLES, 0, 12*3); // Starting from vertex 0; 3 vertices total -> 1 triangle
+		glDrawArrays(GL_TRIANGLES, 0, 12*3);
 
 		glDisableVertexAttribArray(0);
 
@@ -103,9 +112,12 @@ void Car::draw(){
 
 
 void Car::rotate(int leftRight){
-	Eigen::Matrix4f rotationMatrix;
+	Eigen::AngleAxis<float> rotation (rotAngle, upVector.normalized().topRows(3));
 
-	rodriguezMatrix(rotationMatrix, upVector, rotAngle);
+	Eigen::Matrix4f rotationMatrix = Eigen::Matrix4f::Identity();
+	rotationMatrix.topLeftCorner(3,3) = rotation.matrix();
+
+	///rodriguezMatrix(rotationMatrix, upVector, rotAngle);
 
 	currentPose = rotationMatrix * currentPose;
 	direction = rotationMatrix * direction;
@@ -127,6 +139,9 @@ void Car::rodriguezRotate(Eigen::Vector4f axis, float theta, Eigen::Vector4f vec
 }
 
 void Car::rodriguezMatrix(Eigen::Matrix4f matrix, Eigen::Vector4f axis, float theta){
+	if(debugMode)
+		std::cerr<<__PRETTY_FUNCTION__<<" Identify inliers..." << std::endl;
+
 	Eigen::Matrix4f identity = Eigen::Matrix4f::Identity();
 	Eigen::Matrix4f crossProdMatrixK = Eigen::Matrix4f::Zero();
 

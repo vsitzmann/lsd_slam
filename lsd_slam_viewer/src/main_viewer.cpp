@@ -49,8 +49,6 @@
 
 PointCloudViewer* viewer = 0;
 
-
-
 void dynConfCb(lsd_slam_viewer::LSDSLAMViewerParamsConfig &config, uint32_t level)
 {
 	pointTesselation = config.pointTesselation;

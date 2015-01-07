@@ -29,6 +29,9 @@
 #include "qevent.h"
 #include "lsd_slam_viewer/keyframeMsg.h"
 #include "lsd_slam_viewer/keyframeGraphMsg.h"
+#include "Car.h"
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 #include "sophus/sim3.hpp"
 
@@ -234,6 +237,8 @@ private:
 	double lastAnimTime;
 
 	cv::Mat image;
+
+	Car * car;
 
 	void remakeAnimation();
 };

@@ -35,6 +35,7 @@
 
 #include <zlib.h>
 #include <iostream>
+#include <cmath>
 
 #include <GL/glx.h>
 #include <GL/gl.h>
@@ -63,6 +64,7 @@ PointCloudViewer::PointCloudViewer() {
 	currentCamDisplay = 0;
 	graphDisplay = 0;
 	planeEstimator = 0;
+	car = 0;
 
 	for (int i = 0; i < 10; i++) {
 		KFexists[i] = 0;
@@ -206,11 +208,11 @@ void PointCloudViewer::draw() {
 
 	//Load the projection matrix in order to set the field of view and the near- and far clipping planes.
 	//Afterwards, rest the glMatrixMode to GL_MODELVIEW
-	glMatrixMode(GL_MODELVIEW);
-	glLoadMatrixd(modelViewMatrix.data());
-	glMatrixMode(GL_PROJECTION);
-	glLoadMatrixd(camProjectionMatrix.data());
-	glMatrixMode(GL_MODELVIEW);
+//	glMatrixMode(GL_MODELVIEW);
+//	glLoadMatrixd(modelViewMatrix.data());
+//	glMatrixMode(GL_PROJECTION);
+//	glLoadMatrixd(camProjectionMatrix.data());
+//	glMatrixMode(GL_MODELVIEW);
 
 	glPushMatrix();
 
@@ -271,6 +273,8 @@ void PointCloudViewer::draw() {
 	graphDisplay->draw();
 
 //	planeEstimator->draw();
+//
+//	if(car!=0) car->draw();
 
 	glPopMatrix();
 
@@ -432,8 +436,9 @@ void PointCloudViewer::keyPressEvent(QKeyEvent *e) {
 		graphDisplay->printNumbers = true;
 		break;
 
-	case Qt::Key_Q:
+	case Qt::Key_Q:{
 		planeEstimator->beginPlaneTracking();
+	}
 		break;
 
 	default:
