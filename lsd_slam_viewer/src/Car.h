@@ -20,11 +20,16 @@ public:
 	void draw();
 	void moveStraight(int forwBackw);
 	void rotate(int leftRight);
+	void setUpVector(Eigen::Vector4f upVector);
+	void strafe(int leftRight);
 
 private:
 	Eigen::Matrix <float, 4, 4, Eigen::ColMajor> currentPose;
 	Eigen::Vector4f upVector;
 	Eigen::Vector4f baseRotMatrix;
+	Eigen::Vector4f direction;
+
+	float speed;
 	float rotAngle;
 	unsigned int vertexBufferID;
 	int vertexBufferNumPoints;

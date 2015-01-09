@@ -37,24 +37,21 @@ void PlaneEstimator::draw() {
 
 		glDisable(GL_LIGHTING);
 
-		glPushMatrix();
+		glLineWidth(1.0);
 
-			glLineWidth(1.0);
+		glBindBuffer(GL_ARRAY_BUFFER, planeBufferId);
 
-			glBindBuffer(GL_ARRAY_BUFFER, planeBufferId);
+		glVertexPointer(3, GL_FLOAT, sizeof(MyVertex), 0);
+		glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(MyVertex), (const void*) (3*sizeof(float)));
 
-			glVertexPointer(3, GL_FLOAT, sizeof(MyVertex), 0);
-			glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(MyVertex), (const void*) (3*sizeof(float)));
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_COLOR_ARRAY);
 
-			glEnableClientState(GL_VERTEX_ARRAY);
-			glEnableClientState(GL_COLOR_ARRAY);
+		glDrawArrays(GL_LINE_LOOP, 0, planeBufferNumPoints);
 
-			glDrawArrays(GL_LINE_LOOP, 0, planeBufferNumPoints);
+		glDisableClientState(GL_COLOR_ARRAY);
+		glDisableClientState(GL_VERTEX_ARRAY);
 
-			glDisableClientState(GL_COLOR_ARRAY);
-			glDisableClientState(GL_VERTEX_ARRAY);
-
-		glPopMatrix();
 	}
 }
 
@@ -62,7 +59,7 @@ void PlaneEstimator::beginPlaneTracking(){
 	if(debugMode)
 		std::cerr<<__PRETTY_FUNCTION__<<std::endl;
 
-	std::vector<Eigen::Vector3f> inliers = PlaneFitting::ransac(graphDisplay->keyframes, 25, 0.01);
+	std::vector<Eigen::Vector3f> inliers = PlaneFitting::ransac(graphDisplay->keyframes, 25, inlierTolerance);
 
 	MatrixXfrm mat ((int)inliers.size(), 3);
 	mat = Eigen::Map<MatrixXfrm> ((float*)inliers.data(), (int)inliers.size(), 3);
@@ -87,9 +84,10 @@ void PlaneEstimator::refreshPlane(){
  	Eigen::Vector4f planeParams;
 	Eigen::Vector3f P1, P2, P3;
 	int keyframeInlierNo = 0;
+	KeyFrameDisplay * mostRecentFrame = graphDisplay->keyframes.back();
 
 	/*** update the plane estimation with the information of the latest frame ***/
-	std::vector<Eigen::Vector3f> * keyframePointcloud = &(graphDisplay->keyframes.back()->keyframePointcloud);
+	std::vector<Eigen::Vector3f> * keyframePointcloud = &(mostRecentFrame->keyframePointcloud);
 
 	P1 = center;
 	P2 = center + tangent;
@@ -102,7 +100,7 @@ void PlaneEstimator::refreshPlane(){
 	for(unsigned int i = 0; i<keyframePointcloud->size(); i++){
 		dis = PlaneFitting::calcPlanePointDis(planeParams, (*keyframePointcloud)[i]);
 
-		if(dis < 0.05){
+		if(dis < inlierTolerance){
 			inliers.push_back((*keyframePointcloud)[i]);
 		}
 	}
@@ -114,9 +112,9 @@ void PlaneEstimator::refreshPlane(){
 	MatrixXfrm mat (keyframeInlierNo, 3);
 	mat = Eigen::Map<MatrixXfrm> ((float*)inliers.data(), keyframeInlierNo, 3);
 
-	center = mat.colwise().mean().transpose();
+	keyframeCenter = mat.colwise().mean().transpose();
 
-	Eigen::MatrixXf centered = mat.rowwise() - 	center.transpose();
+	Eigen::MatrixXf centered = mat.rowwise() - 	keyframeCenter.transpose();
 	keyframeCovMatrix = (centered.adjoint() * centered) / float(mat.rows());
 
 	covarianceMatrix = (covarianceMatrix*totalInlierNumber + keyframeCovMatrix*keyframeInlierNo) / float(keyframeInlierNo+totalInlierNumber);
@@ -126,6 +124,12 @@ void PlaneEstimator::refreshPlane(){
 
 	tangent =  eig.eigenvectors().col(2);
 	bitangent =  eig.eigenvectors().col(1);
+
+	center = keyframeCenter;
+
+//	Eigen::Vector3f normal = tangent.cross(bitangent).normalized();
+//
+//	center = mostRecentFrame->camToWorld.translation() - (mostRecentFrame->camToWorld.translation().dot(normal)-inliers[0].dot(normal)) * normal;
 
 	Eigen::Vector3f triangleWidth = tangent/10;
 	Eigen::Vector3f triangleHeight = bitangent/10;

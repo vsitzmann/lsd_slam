@@ -55,5 +55,6 @@ float FY1;
 float CX1;
 float CY1;
 
+float inlierTolerance = 0.01;
 int downsampleFactor = 10;
 unsigned int beginPlaneTrackingIndex =10;

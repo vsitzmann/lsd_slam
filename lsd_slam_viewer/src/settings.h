@@ -51,5 +51,6 @@ extern float FY1;
 extern float CX1;
 extern float CY1;
 
+extern float inlierTolerance;
 extern int downsampleFactor;
 extern unsigned int beginPlaneTrackingIndex;

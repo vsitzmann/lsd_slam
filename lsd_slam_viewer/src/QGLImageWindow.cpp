@@ -167,11 +167,12 @@ GLImageWindow::~GLImageWindow()
 {
     if(image != 0) delete[] image;
     delete planeEstimator;
+	delete car;
 }
 
 void GLImageWindow::initializeGL()
 {
-
+	glEnable( GL_DEPTH_TEST );
 }
 
 void GLImageWindow::paintGL()
@@ -208,6 +209,7 @@ void GLImageWindow::paintGL()
 			glLoadMatrixd(viewer->camProjectionMatrix.data());
 
 			if(car != 0) car->draw();
+			graphDisplay->draw();
 
 			planeEstimator->draw();
 
@@ -277,12 +279,22 @@ void GLImageWindow::keyPressEvent(QKeyEvent *ke)
 	switch(ke->key()){
 		case Qt::Key_Q:
 			planeEstimator->beginPlaneTracking();
-			break;
-		case Qt::Key_A:
 			initARDemo();
 			break;
+		case Qt::Key_A:
+
+			break;
 		case Qt::Key_Up:
+			if(car) car->moveStraight(-1);
+			break;
+		case Qt::Key_Down:
 			if(car) car->moveStraight(1);
+			break;
+		case Qt::Key_Left:
+			if(car) car->strafe(1);
+			break;
+		case Qt::Key_Right:
+			if(car) car->strafe(-1);
 			break;
 	}
 
@@ -298,8 +310,22 @@ void GLImageWindow::initARDemo(){
 	Eigen::Matrix4f initialCarPose = Eigen::Matrix4f::Identity();
 	initialCarPose.rightCols(1).topRows(3) = this->planeEstimator->center;
 
+	Eigen::Vector3f x, y, z;
+
+	x = planeEstimator->tangent.normalized();
+	y = planeEstimator->bitangent.normalized();
+	z = x.cross(y).normalized();
+
+	Eigen::Matrix3f rot;
+
+	rot.col(1) = x;
+	rot.col(2) = y;
+	rot.col(3) = z;
+
+	initialCarPose.topLeftCorner(3,3) = rot;
+
 	Eigen::Vector4f upVector = Eigen::Vector4f::Zero();
-	upVector.topRows(3) = this->planeEstimator->bitangent.cross(this->planeEstimator->tangent);
+	upVector.topRows(3) = z;
 
 	this->car = new Car(initialCarPose, upVector,  planeEstimator->tangent.norm()/10);
 }

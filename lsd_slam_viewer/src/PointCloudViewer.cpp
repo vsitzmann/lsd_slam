@@ -82,6 +82,8 @@ PointCloudViewer::PointCloudViewer() {
 PointCloudViewer::~PointCloudViewer() {
 	delete currentCamDisplay;
 	delete graphDisplay;
+	delete car;
+	delete planeEstimator;
 }
 
 void PointCloudViewer::reset() {
@@ -270,11 +272,11 @@ void PointCloudViewer::draw() {
 	if (showCurrentPointcloud)
 		currentCamDisplay->drawPC(pointTesselation, 1);
 
-	graphDisplay->draw();
+//	if(car!=0) car->draw();
+
+//	graphDisplay->draw();
 
 //	planeEstimator->draw();
-//
-//	if(car!=0) car->draw();
 
 	glPopMatrix();
 
@@ -438,6 +440,28 @@ void PointCloudViewer::keyPressEvent(QKeyEvent *e) {
 
 	case Qt::Key_Q:{
 		planeEstimator->beginPlaneTracking();
+
+		Eigen::Matrix4f initialCarPose = Eigen::Matrix4f::Identity();
+		initialCarPose.rightCols(1).topRows(3) = planeEstimator->center;
+
+		Eigen::Vector3f x, y, z;
+
+		x = planeEstimator->tangent.normalized();
+		y = planeEstimator->bitangent.normalized();
+		z = x.cross(y).normalized();
+
+		Eigen::Matrix3f rot;
+
+		rot.col(1) = x;
+		rot.col(2) = y;
+		rot.col(3) = z;
+
+		initialCarPose.topLeftCorner(3,3) = rot;
+
+		Eigen::Vector4f upVector = Eigen::Vector4f::Zero();
+		upVector.topRows(3) = z;
+
+		car = new Car(initialCarPose, upVector,  planeEstimator->tangent.norm()/10);
 	}
 		break;
 

@@ -49,9 +49,6 @@ private:
 	int planeBufferNumPoints;
 	int lastUpdateFrame;
 
-	int height;
-	int width;
-
 	KeyFrameGraphDisplay *graphDisplay;
 	KeyFrameDisplay * keyFrameDisplay;
 };

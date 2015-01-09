@@ -58,18 +58,18 @@ float verticeArray [] = {
 };
 
 Car::Car(Eigen::Matrix4f initialPose, Eigen::Vector4f upVector, float sizeFactor) {
-	// TODO Auto-generated constructor stub
-
 	this->rotAngle = 0;
 	this->currentPose = initialPose;
-	this->upVector = upVector;
+	this->upVector = upVector.normalized();
+	this->speed = 0.1;
+	this->direction = Eigen::Vector4f::Zero();
 
 	vertexBufferID = 0;
 
 	this->rotAngle = (10/360)*2*M_PI;
 
 	for(int i = 0; i<36*3; i++){
-		verticeArray[i] *= sizeFactor;
+		verticeArray[i] *= -sizeFactor;
 	}
 
 	glGenBuffers(1, &vertexBufferID);
@@ -78,7 +78,6 @@ Car::Car(Eigen::Matrix4f initialPose, Eigen::Vector4f upVector, float sizeFactor
 }
 
 Car::~Car() {
-	// TODO Auto-generated destructor stub
 }
 
 void Car::draw(){
@@ -90,7 +89,6 @@ void Car::draw(){
 	glPushMatrix();
 		glMultMatrixf(currentPose.data());
 
-	// 1rst attribute buffer : vertices
 		glEnableVertexAttribArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
 		glVertexAttribPointer(
@@ -102,7 +100,6 @@ void Car::draw(){
 		   (void*)0            // array buffer offset
 		);
 
-		// Draw the triangle !
 		glDrawArrays(GL_TRIANGLES, 0, 12*3);
 
 		glDisableVertexAttribArray(0);
@@ -112,19 +109,36 @@ void Car::draw(){
 
 
 void Car::rotate(int leftRight){
-	Eigen::AngleAxis<float> rotation (rotAngle, upVector.normalized().topRows(3));
+	Eigen::AngleAxis<float> rotation (rotAngle, upVector.topRows(3).normalized());
 
 	Eigen::Matrix4f rotationMatrix = Eigen::Matrix4f::Identity();
 	rotationMatrix.topLeftCorner(3,3) = rotation.matrix();
 
 	///rodriguezMatrix(rotationMatrix, upVector, rotAngle);
 
-	currentPose = rotationMatrix * currentPose;
-	direction = rotationMatrix * direction;
+	currentPose = leftRight * rotationMatrix * currentPose;
 }
 
 void Car::moveStraight(int forwBackw){
-	currentPose.rightCols(1) += direction;
+	if(debugMode)
+		std::cerr<<__PRETTY_FUNCTION__<<std::endl;
+
+	Eigen::Vector4f buffer = currentPose.topLeftCorner(3,3) * (Eigen::Vector3f (1,1,1));
+
+	direction = buffer - (buffer.dot(upVector)/upVector.norm()) * upVector;
+
+	currentPose.rightCols(1) += forwBackw * direction * speed;
+}
+
+void Car::strafe(int leftRight){
+	if(debugMode)
+		std::cerr<<__PRETTY_FUNCTION__<<std::endl;
+
+	Eigen::Vector4f buffer = currentPose.topLeftCorner(3,3) * (Eigen::Vector3f (1,1,1));
+
+	direction = homogenousCrossProduct(upVector, (buffer - (buffer.dot(upVector)/upVector.norm()) * upVector));
+
+	currentPose.rightCols(1) += leftRight * direction * speed;
 }
 
 void Car::rodriguezRotate(Eigen::Vector4f axis, float theta, Eigen::Vector4f vector){
@@ -136,6 +150,11 @@ void Car::rodriguezRotate(Eigen::Vector4f axis, float theta, Eigen::Vector4f vec
 	float dotProduct = axis.dot(vector);
 
 	vector = vector * cosine + crossProduct * sine + axis * dotProduct * (1-cosine);
+}
+
+void Car::setUpVector(Eigen::Vector4f upVector){
+
+
 }
 
 void Car::rodriguezMatrix(Eigen::Matrix4f matrix, Eigen::Vector4f axis, float theta){
