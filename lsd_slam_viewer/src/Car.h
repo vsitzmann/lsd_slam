@@ -20,11 +20,12 @@ public:
 	void draw();
 	void moveStraight(int forwBackw);
 	void rotate(int leftRight);
-	void setUpVector(Eigen::Vector4f upVector);
 	void strafe(int leftRight);
+	void updatePlane(Eigen::Vector3f normal, Eigen::Vector3f inlier);
+
+	Eigen::Matrix <float, 4, 4, Eigen::ColMajor> currentPose;
 
 private:
-	Eigen::Matrix <float, 4, 4, Eigen::ColMajor> currentPose;
 	Eigen::Vector4f upVector;
 	Eigen::Vector4f baseRotMatrix;
 	Eigen::Vector4f direction;

@@ -72,19 +72,29 @@ Car::Car(Eigen::Matrix4f initialPose, Eigen::Vector4f upVector, float sizeFactor
 		verticeArray[i] *= -sizeFactor;
 	}
 
-	glGenBuffers(1, &vertexBufferID);
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);         // for vertex coordinates
-	glBufferData(GL_ARRAY_BUFFER, sizeof(verticeArray), verticeArray, GL_STATIC_DRAW);
+	currentPose(2,3)-=2*sizeFactor;
+
+	if(debugMode){
+		std::cerr<<__PRETTY_FUNCTION__<<std::endl;
+		std::cerr<<"Initial Pose: "<<initialPose<<std::endl;
+	}
+
 }
 
 Car::~Car() {
 }
 
-void Car::draw(){
-	if(debugMode)
-		std::cerr<<__PRETTY_FUNCTION__<<std::endl;
+void Car::updatePlane(Eigen::Vector3f normal, Eigen::Vector3f inlier){
 
+
+}
+
+void Car::draw(){
 	glMatrixMode(GL_MODELVIEW);
+
+	glGenBuffers(1, &vertexBufferID);
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);         // for vertex coordinates
+	glBufferData(GL_ARRAY_BUFFER, sizeof(verticeArray), verticeArray, GL_STATIC_DRAW);
 
 	glPushMatrix();
 		glMultMatrixf(currentPose.data());
@@ -128,6 +138,9 @@ void Car::moveStraight(int forwBackw){
 	direction = buffer - (buffer.dot(upVector)/upVector.norm()) * upVector;
 
 	currentPose.rightCols(1) += forwBackw * direction * speed;
+
+	if(debugMode)
+		std::cerr<<currentPose<<std::endl;
 }
 
 void Car::strafe(int leftRight){
@@ -139,6 +152,9 @@ void Car::strafe(int leftRight){
 	direction = homogenousCrossProduct(upVector, (buffer - (buffer.dot(upVector)/upVector.norm()) * upVector));
 
 	currentPose.rightCols(1) += leftRight * direction * speed;
+
+	if(debugMode)
+		std::cerr<<currentPose<<std::endl;
 }
 
 void Car::rodriguezRotate(Eigen::Vector4f axis, float theta, Eigen::Vector4f vector){
@@ -150,11 +166,6 @@ void Car::rodriguezRotate(Eigen::Vector4f axis, float theta, Eigen::Vector4f vec
 	float dotProduct = axis.dot(vector);
 
 	vector = vector * cosine + crossProduct * sine + axis * dotProduct * (1-cosine);
-}
-
-void Car::setUpVector(Eigen::Vector4f upVector){
-
-
 }
 
 void Car::rodriguezMatrix(Eigen::Matrix4f matrix, Eigen::Vector4f axis, float theta){

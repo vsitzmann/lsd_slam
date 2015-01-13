@@ -27,6 +27,7 @@
 #include <unordered_set>
 
 #include <boost/thread.hpp>
+#include <queue>
 
 const bool useImageDisplayThread = true;
 
@@ -36,9 +37,8 @@ boost::condition_variable  openCVdisplaySignal;
 
 
 boost::thread* imageDisplayThread = 0;
-std::vector<DisplayImageObect> displayQueue;
+std::queue<DisplayImageObect> displayQueue;
 bool imageThreadKeepRunning = true;
-
 
 boost::mutex keyPressMutex;
 boost::condition_variable keyPressCondition;
@@ -65,7 +65,7 @@ void displayThreadLoop(QApplication* app, PointCloudViewer * viewer)
 			{
 				if(openWindows[i]->name == displayQueue.back().name)
 				{
-					openWindows[i]->loadImage(displayQueue.back().img, displayQueue.back().autoSize);
+					openWindows[i]->loadImage(displayQueue.front().img, displayQueue.front().autoSize);
 					openWindows[i]->show();
 					found = true;
 				}
@@ -73,12 +73,12 @@ void displayThreadLoop(QApplication* app, PointCloudViewer * viewer)
 
 			if(!found)
 			{
-				GLImageWindow* window = new GLImageWindow(displayQueue.back().name, 0, viewer);
+				GLImageWindow* window = new GLImageWindow(displayQueue.front().name, 0, viewer);
 				openWindows.push_back(window);
-				window->loadImage(displayQueue.back().img, displayQueue.back().autoSize);
+				window->loadImage(displayQueue.front().img, displayQueue.front().autoSize);
 				window->show();
 			}
-			displayQueue.pop_back();
+			displayQueue.pop();
 		}
 	}
 
@@ -103,7 +103,7 @@ void displayImage(const char* windowName, const cv::Mat& image, bool autoSize)
 	if(useImageDisplayThread)
 	{
 		boost::unique_lock<boost::mutex> lock(openCVdisplayMutex);
-		displayQueue.push_back(DisplayImageObect());
+		displayQueue.push(DisplayImageObect());
 		displayQueue.back().autoSize = autoSize;
 		displayQueue.back().img = image.clone();
 		displayQueue.back().name = windowName;
@@ -138,7 +138,7 @@ void closeAllWindows()
 
 
 GLImageWindow::GLImageWindow(std::string name, QWidget *parent, PointCloudViewer * viewer) :
-    QGLWidget(parent)
+    QGLWidget(parent, viewer)
 {
     setWindowTitle(tr(name.c_str()));
 
@@ -207,8 +207,8 @@ void GLImageWindow::paintGL()
 		glPushMatrix();
 
 			glLoadMatrixd(viewer->camProjectionMatrix.data());
+			glMatrixMode(GL_MODELVIEW);
 
-			if(car != 0) car->draw();
 			graphDisplay->draw();
 
 			planeEstimator->draw();
@@ -279,53 +279,25 @@ void GLImageWindow::keyPressEvent(QKeyEvent *ke)
 	switch(ke->key()){
 		case Qt::Key_Q:
 			planeEstimator->beginPlaneTracking();
-			initARDemo();
 			break;
 		case Qt::Key_A:
 
 			break;
 		case Qt::Key_Up:
-			if(car) car->moveStraight(-1);
+			planeEstimator->car->moveStraight(-1);
 			break;
 		case Qt::Key_Down:
-			if(car) car->moveStraight(1);
+			planeEstimator->car->moveStraight(1);
 			break;
 		case Qt::Key_Left:
-			if(car) car->strafe(1);
+			planeEstimator->car->strafe(1);
 			break;
 		case Qt::Key_Right:
-			if(car) car->strafe(-1);
+			planeEstimator->car->strafe(-1);
 			break;
 	}
 
 	boost::unique_lock<boost::mutex> lock(keyPressMutex);
 	lastKey = ke->key();
 	keyPressCondition.notify_one();
-}
-
-void GLImageWindow::initARDemo(){
-	if(debugMode)
-		std::cerr<<__PRETTY_FUNCTION__<<std::endl;
-
-	Eigen::Matrix4f initialCarPose = Eigen::Matrix4f::Identity();
-	initialCarPose.rightCols(1).topRows(3) = this->planeEstimator->center;
-
-	Eigen::Vector3f x, y, z;
-
-	x = planeEstimator->tangent.normalized();
-	y = planeEstimator->bitangent.normalized();
-	z = x.cross(y).normalized();
-
-	Eigen::Matrix3f rot;
-
-	rot.col(1) = x;
-	rot.col(2) = y;
-	rot.col(3) = z;
-
-	initialCarPose.topLeftCorner(3,3) = rot;
-
-	Eigen::Vector4f upVector = Eigen::Vector4f::Zero();
-	upVector.topRows(3) = z;
-
-	this->car = new Car(initialCarPose, upVector,  planeEstimator->tangent.norm()/10);
 }

@@ -14,7 +14,6 @@ export CPATH="/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/dev
 export LD_LIBRARY_PATH="/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/devel/lib:/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/devel/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
 export PATH="/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/devel/bin:$PATH"
 export PKG_CONFIG_PATH="/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/devel/lib/pkgconfig:/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/devel/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH"
-export PWD="/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer"
 export PYTHONPATH="/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/devel/lib/python2.7/dist-packages:$PYTHONPATH"
 export ROSLISP_PACKAGE_DIRECTORIES="/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/devel/share/common-lisp"
 export ROS_PACKAGE_PATH="/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer:/opt/ros/indigo/share:/opt/ros/indigo/stacks"

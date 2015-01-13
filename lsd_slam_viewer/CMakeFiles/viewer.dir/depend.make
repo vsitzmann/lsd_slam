@@ -1112,6 +1112,7 @@ CMakeFiles/viewer.dir/src/KeyFrameGraphDisplay.cpp.o: thirdparty/Sophus/sophus/s
 CMakeFiles/viewer.dir/src/KeyFrameGraphDisplay.cpp.o: thirdparty/Sophus/sophus/so3.hpp
 CMakeFiles/viewer.dir/src/KeyFrameGraphDisplay.cpp.o: thirdparty/Sophus/sophus/sophus.hpp
 
+CMakeFiles/viewer.dir/src/PlaneEstimator.cpp.o: src/Car.h
 CMakeFiles/viewer.dir/src/PlaneEstimator.cpp.o: src/KeyFrameDisplay.h
 CMakeFiles/viewer.dir/src/PlaneEstimator.cpp.o: src/KeyFrameGraphDisplay.h
 CMakeFiles/viewer.dir/src/PlaneEstimator.cpp.o: src/PlaneEstimator.cpp

@@ -1113,6 +1113,7 @@ CMakeFiles/viewer.dir/src/KeyFrameGraphDisplay.cpp.o
  thirdparty/Sophus/sophus/so3.hpp
  thirdparty/Sophus/sophus/sophus.hpp
 CMakeFiles/viewer.dir/src/PlaneEstimator.cpp.o
+ /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/src/Car.h
  /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/src/KeyFrameDisplay.h
  /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/src/KeyFrameGraphDisplay.h
  /home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/src/PlaneEstimator.cpp

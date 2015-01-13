@@ -9,6 +9,7 @@
 #define SRC_PLANEESTIMATOR_H_
 
 #include "sophus/sim3.hpp"
+#include "Car.h"
 
 #include "KeyFrameDisplay.h"
 #include "KeyFrameGraphDisplay.h"
@@ -32,10 +33,13 @@ public:
 	Eigen::Vector3f tangent;
 	Eigen::Vector3f bitangent;
 
+	Car * car;
+
 private:
 	/***** Functions ******/
 	void refreshPlane();
 	void calcKeyframeCovMatrix(std::vector<Eigen::Vector3f> * keyframePointcloud, Eigen::Matrix3f &covarianceMatrix, Eigen::Vector3f & keyframeCenter);
+	void initARDemo();
 
 	/**** Variables ****/
 	Eigen::Matrix3f covarianceMatrix;
