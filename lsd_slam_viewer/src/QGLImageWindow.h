@@ -40,22 +40,21 @@ class GLImageWindow : public QGLWidget
         void showTitlePage();
         void initARDemo();
     private:
-        PlaneEstimator * planeEstimator;
-        KeyFrameGraphDisplay * graphDisplay;
         PointCloudViewer * viewer;
 
         int width_img, height_img;
         unsigned char* image;
         Car * car;
-
     };
 
 void displayImage(const char* windowName, const cv::Mat& image, bool autoSize = true);
+void enqueueImage(const sensor_msgs::ImageConstPtr& msg);
+void popImage(int imageId);
 int waitKey(int milliseconds);
 void closeAllWindows();
 
-
 void displayThreadLoop(QApplication* app=0, PointCloudViewer * viewer = 0);
+
 
 
 

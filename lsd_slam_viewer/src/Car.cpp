@@ -72,7 +72,7 @@ Car::Car(Eigen::Matrix4f initialPose, Eigen::Vector4f upVector, float sizeFactor
 		verticeArray[i] *= -sizeFactor;
 	}
 
-	currentPose(2,3)-=2*sizeFactor;
+	currentPose(2,3)-=sizeFactor;
 
 	if(debugMode){
 		std::cerr<<__PRETTY_FUNCTION__<<std::endl;

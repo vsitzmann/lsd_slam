@@ -14,12 +14,14 @@
 #include "KeyFrameDisplay.h"
 #include "KeyFrameGraphDisplay.h"
 
+#include "PointCloudViewer.h"
+
 class KeyFrameGraphDisplay;
 class KeyFrameDisplay;
 
 class PlaneEstimator {
 public:
-	PlaneEstimator(KeyFrameGraphDisplay * graphDisplay);
+	PlaneEstimator(PointCloudViewer * viewer);
 	virtual ~PlaneEstimator();
 
 	void draw();
@@ -29,9 +31,12 @@ public:
 
 	void beginPlaneTracking();
 
-	Eigen::Vector3f center;
-	Eigen::Vector3f tangent;
-	Eigen::Vector3f bitangent;
+	Eigen::Vector3f initialCenter;
+	Eigen::Vector3f initialTangent;
+	Eigen::Vector3f initialBitangent;
+
+	Eigen::Vector3f currentTangent;
+	Eigen::Vector3f currentBitangent;
 
 	Car * car;
 
@@ -53,8 +58,7 @@ private:
 	int planeBufferNumPoints;
 	int lastUpdateFrame;
 
-	KeyFrameGraphDisplay *graphDisplay;
-	KeyFrameDisplay * keyFrameDisplay;
+	PointCloudViewer * viewer;
 };
 
 #endif /* SRC_PLANEESTIMATOR_H_ */

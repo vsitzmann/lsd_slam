@@ -18,8 +18,9 @@
 
 typedef Eigen::Matrix<float,Eigen::Dynamic,Eigen::Dynamic, Eigen::RowMajor> MatrixXfrm;
 
-PlaneEstimator::PlaneEstimator(KeyFrameGraphDisplay * graphDisplay) {
-	this->graphDisplay = graphDisplay;
+PlaneEstimator::PlaneEstimator(PointCloudViewer * viewer) {
+
+	this->viewer = viewer;
 
 	lastUpdateFrame = 0;
 }
@@ -59,14 +60,17 @@ void PlaneEstimator::beginPlaneTracking(){
 	if(debugMode)
 		std::cerr<<__PRETTY_FUNCTION__<<std::endl;
 
-	std::vector<Eigen::Vector3f> inliers = PlaneFitting::ransac(graphDisplay->keyframes, 25, inlierTolerance);
+	std::vector<Eigen::Vector3f> inliers = PlaneFitting::ransac(viewer->graphDisplay->keyframes, 35, inlierTolerance);
 
 	MatrixXfrm mat ((int)inliers.size(), 3);
 	mat = Eigen::Map<MatrixXfrm> ((float*)inliers.data(), (int)inliers.size(), 3);
 
 	totalInlierNumber = inliers.size();
 
-	covarianceMatrix = PlaneFitting::pcaPlaneFitting(mat, tangent, bitangent, center);
+	covarianceMatrix = PlaneFitting::pcaPlaneFitting(mat, initialTangent, initialBitangent, initialCenter);
+
+	currentTangent = initialTangent;
+	currentBitangent = initialBitangent;
 
 	initARDemo();
 
@@ -74,8 +78,8 @@ void PlaneEstimator::beginPlaneTracking(){
 }
 
 void PlaneEstimator::refreshPlane(){
-	if(lastUpdateFrame == graphDisplay->keyframes.size()) return;
-	lastUpdateFrame = graphDisplay->keyframes.size();
+	if(lastUpdateFrame == viewer->graphDisplay->keyframes.size()) return;
+	lastUpdateFrame = viewer->graphDisplay->keyframes.size();
 
 	Eigen::Matrix3f keyframeCovMatrix;
 	Eigen::Vector3f keyframeCenter;
@@ -83,17 +87,15 @@ void PlaneEstimator::refreshPlane(){
 	std::vector<Eigen::Vector3f> inliers;
  	Eigen::Vector4f planeParams;
 	Eigen::Vector3f P1, P2, P3;
-	Eigen::Vector3f keyframeTangent;
-	Eigen::Vector3f keyframeBitangent;
 	int keyframeInlierNo = 0;
-	KeyFrameDisplay * mostRecentFrame = graphDisplay->keyframes.back();
+	KeyFrameDisplay * mostRecentFrame = viewer->graphDisplay->keyframes.back();
 
 	/*** update the plane estimation with the information of the latest frame ***/
 	std::vector<Eigen::Vector3f> * keyframePointcloud = &(mostRecentFrame->keyframePointcloud);
 
-	P1 = center;
-	P2 = center + tangent;
-	P3 = center + bitangent;
+	P1 = initialCenter;
+	P2 = initialCenter + initialTangent;
+	P3 = initialCenter + initialBitangent;
 
 	planeParams = PlaneFitting::calcPlaneParams(P1, P2, P3);
 
@@ -102,7 +104,7 @@ void PlaneEstimator::refreshPlane(){
 	for(unsigned int i = 0; i<keyframePointcloud->size(); i++){
 		dis = PlaneFitting::calcPlanePointDis(planeParams, (*keyframePointcloud)[i]);
 
-		if(dis < inlierTolerance){
+		if(dis < inlierTolerance*2){
 			inliers.push_back((*keyframePointcloud)[i]);
 		}
 	}
@@ -124,12 +126,12 @@ void PlaneEstimator::refreshPlane(){
 
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(covarianceMatrix);
 
-	keyframeTangent =  eig.eigenvectors().col(2);
-	keyframeBitangent =  eig.eigenvectors().col(1);
-	normal = keyframeTangent.cross(keyframeBitangent).normalized();
+	currentTangent =  eig.eigenvectors().col(2);
+	currentBitangent =  eig.eigenvectors().col(1);
+	normal = currentTangent.cross(currentBitangent).normalized();
 
-	keyframeTangent = tangent - (tangent.dot(normal)) * normal;
-	keyframeBitangent = bitangent - (bitangent.dot(normal)) * normal;
+	currentTangent = initialTangent - (initialTangent.dot(normal)) * normal;
+	currentBitangent = initialBitangent - (initialBitangent.dot(normal)) * normal;
 
 //	center = keyframeCenter;
 
@@ -137,9 +139,9 @@ void PlaneEstimator::refreshPlane(){
 //
 //	center = mostRecentFrame->camToWorld.translation() - (mostRecentFrame->camToWorld.translation().dot(normal)-inliers[0].dot(normal)) * normal;
 
-	Eigen::Vector3f triangleWidth = keyframeTangent.normalized()/10;
-	Eigen::Vector3f triangleHeight = keyframeBitangent.normalized()/10;
-	Eigen::Vector3f virtualCenter = center-2.5*keyframeTangent.normalized()-2.5*keyframeBitangent.normalized();
+	Eigen::Vector3f triangleWidth = currentTangent.normalized()/10;
+	Eigen::Vector3f triangleHeight = currentBitangent.normalized()/10;
+	Eigen::Vector3f virtualCenter = initialCenter-2.5*currentTangent.normalized()-2.5*currentBitangent.normalized();
 
 	std::vector<MyVertex> planeVertices;
 
@@ -179,12 +181,12 @@ void PlaneEstimator::initARDemo(){
 		std::cerr<<__PRETTY_FUNCTION__<<std::endl;
 
 	Eigen::Matrix4f initialCarPose = Eigen::Matrix4f::Identity();
-	initialCarPose.rightCols(1).topRows(3) = center;
+	initialCarPose.rightCols(1).topRows(3) = initialCenter;
 
 	Eigen::Vector3f x, y, z;
 
-	x = tangent.normalized();
-	y = bitangent.normalized();
+	x = currentTangent.normalized();
+	y = currentBitangent.normalized();
 	z = x.cross(y).normalized();
 
 	Eigen::Matrix3f rot;
@@ -198,6 +200,6 @@ void PlaneEstimator::initARDemo(){
 	Eigen::Vector4f upVector = Eigen::Vector4f::Zero();
 	upVector.topRows(3) = z;
 
-	this->car = new Car(initialCarPose, upVector,  tangent.norm()/10);
+	this->car = new Car(initialCarPose, upVector,  0.1);
 }
 

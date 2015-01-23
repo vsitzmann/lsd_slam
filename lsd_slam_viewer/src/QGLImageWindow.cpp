@@ -18,7 +18,13 @@
 * along with LSD-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#define GL_GLEXT_PROTOTYPES 1
+
 #include "QGLImageWindow.h"
+
+#include <GL/glx.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
 
 #include <opencv2/opencv.hpp>
 #include <Eigen/Geometry>
@@ -29,23 +35,35 @@
 #include <boost/thread.hpp>
 #include <queue>
 
+#include "opencv2/opencv.hpp"
+#include "settings.h"
+
 const bool useImageDisplayThread = true;
 
 std::vector<GLImageWindow*> openWindows;
 boost::mutex openCVdisplayMutex;
 boost::condition_variable  openCVdisplaySignal;
 
-
 boost::thread* imageDisplayThread = 0;
 std::queue<DisplayImageObect> displayQueue;
 bool imageThreadKeepRunning = true;
+
+std::queue<sensor_msgs::ImageConstPtr> msgQueue;
 
 boost::mutex keyPressMutex;
 boost::condition_variable keyPressCondition;
 int lastKey=0;
 
+int idOffset = 0;
+unsigned currentFrameID = 0;
+bool firstPop = true;
+PointCloudViewer * _viewer;
+
 void displayThreadLoop(QApplication* app, PointCloudViewer * viewer)
 {
+
+	_viewer = viewer;
+
 	printf("started image display thread!\n");
 	boost::unique_lock<boost::mutex> lock(openCVdisplayMutex);
 	while(imageThreadKeepRunning)
@@ -100,6 +118,8 @@ void makeDisplayThread()
 
 void displayImage(const char* windowName, const cv::Mat& image, bool autoSize)
 {
+	if(debugMode) std::cout<<__PRETTY_FUNCTION__<<std::endl;
+
 	if(useImageDisplayThread)
 	{
 		boost::unique_lock<boost::mutex> lock(openCVdisplayMutex);
@@ -109,6 +129,34 @@ void displayImage(const char* windowName, const cv::Mat& image, bool autoSize)
 		displayQueue.back().name = windowName;
 
 		openCVdisplaySignal.notify_one();
+	}
+}
+
+void enqueueImage(const sensor_msgs::ImageConstPtr& msg)
+{
+
+	msgQueue.push(msg);
+}
+
+void popImage(int imageId){
+
+	if(msgQueue.empty()) return;
+
+	if(currentFrameID>imageId | firstPop){
+		idOffset = msgQueue.front()->header.seq - imageId;
+		firstPop = false;
+	}
+
+	currentFrameID = imageId;
+
+	while(msgQueue.front()->header.seq<=imageId+idOffset){
+		cv::Mat image =  cv_bridge::toCvShare(msgQueue.front(), "rgb8")->image;
+
+		displayImage("AR Demo", image, false);
+
+		msgQueue.pop();
+
+		if(msgQueue.empty()) break;
 	}
 }
 
@@ -134,9 +182,6 @@ void closeAllWindows()
 
 }
 
-
-
-
 GLImageWindow::GLImageWindow(std::string name, QWidget *parent, PointCloudViewer * viewer) :
     QGLWidget(parent, viewer)
 {
@@ -152,36 +197,35 @@ GLImageWindow::GLImageWindow(std::string name, QWidget *parent, PointCloudViewer
     glViewport(0,0,640,480);
 
     this->name = name;
-    this->planeEstimator = viewer->planeEstimator;
-    this->graphDisplay = viewer->graphDisplay;
     this->viewer = viewer;
     this->car = 0;
 
     QTimer *timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(update()));
     timer->start(10);
-
 }
 
 GLImageWindow::~GLImageWindow()
 {
     if(image != 0) delete[] image;
-    delete planeEstimator;
 	delete car;
 }
 
 void GLImageWindow::initializeGL()
 {
-	glEnable( GL_DEPTH_TEST );
 }
+
 
 void GLImageWindow::paintGL()
 {
+	if(debugMode) std::cout<<__PRETTY_FUNCTION__<<std::endl;
+
     makeCurrent();
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
 	if(image != 0)
 	{
+
 		glMatrixMode(GL_MODELVIEW);
 
 		glPushMatrix();
@@ -195,6 +239,7 @@ void GLImageWindow::paintGL()
 				glRasterPos2f( -1,1);
 				glPixelZoom( width() / (float)width_img, -height()/(float)height_img );
 				glDrawPixels( width_img, height_img, GL_BGR, GL_UNSIGNED_BYTE, image);
+
 			glPopMatrix();
 		glPopMatrix();
 	}
@@ -209,9 +254,11 @@ void GLImageWindow::paintGL()
 			glLoadMatrixd(viewer->camProjectionMatrix.data());
 			glMatrixMode(GL_MODELVIEW);
 
-			graphDisplay->draw();
+			glEnable(GL_DEPTH_TEST);
 
-			planeEstimator->draw();
+			viewer->graphDisplay->draw();
+
+			viewer->planeEstimator->draw();
 
 		glPopMatrix();
 	glPopMatrix();
@@ -231,14 +278,13 @@ void GLImageWindow::loadImage(cv::Mat m, bool resize)
     	image = new unsigned char[3*m.cols*m.rows];
     }
 
-
     width_img=m.cols;
     height_img=m.rows;
 
     if(resize && (width() != width_img || height() != height_img))
     {
-    	//glViewport(0,0,width_img,height_img);
-    	this->resize(width_img, height_img);
+//    	glViewport(0,0,width_img,height_img);
+//    	this->resize(width_img, height_img);
     }
 
     if(m.type() == CV_8UC3)
@@ -278,22 +324,22 @@ void GLImageWindow::keyPressEvent(QKeyEvent *ke)
 {
 	switch(ke->key()){
 		case Qt::Key_Q:
-			planeEstimator->beginPlaneTracking();
+			viewer->planeEstimator->beginPlaneTracking();
 			break;
 		case Qt::Key_A:
 
 			break;
 		case Qt::Key_Up:
-			planeEstimator->car->moveStraight(-1);
+			viewer->planeEstimator->car->moveStraight(-1);
 			break;
 		case Qt::Key_Down:
-			planeEstimator->car->moveStraight(1);
+			viewer->planeEstimator->car->moveStraight(1);
 			break;
 		case Qt::Key_Left:
-			planeEstimator->car->strafe(1);
+			viewer->planeEstimator->car->strafe(1);
 			break;
 		case Qt::Key_Right:
-			planeEstimator->car->strafe(-1);
+			viewer->planeEstimator->car->strafe(-1);
 			break;
 	}
 
@@ -301,3 +347,4 @@ void GLImageWindow::keyPressEvent(QKeyEvent *ke)
 	lastKey = ke->key();
 	keyPressCondition.notify_one();
 }
+

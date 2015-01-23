@@ -85,6 +85,8 @@ void frameCb(lsd_slam_viewer::keyframeMsgConstPtr msg)
 
 	if(msg->time > lastFrameTime) return;
 
+	popImage(msg->id);
+
 	if(viewer != 0)
 		viewer->addFrameMsg(msg);
 }
@@ -96,9 +98,7 @@ void graphCb(lsd_slam_viewer::keyframeGraphMsgConstPtr msg)
 
 void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-	cv::Mat image =  cv_bridge::toCvShare(msg, "rgb8")->image;
-
-	displayImage("Video Stream", image, false);
+	enqueueImage(msg);
 }
 
 

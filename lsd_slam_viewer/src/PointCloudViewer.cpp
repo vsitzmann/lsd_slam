@@ -94,7 +94,7 @@ void PointCloudViewer::reset() {
 
 	currentCamDisplay = new KeyFrameDisplay();
 	graphDisplay = new KeyFrameGraphDisplay();
-	planeEstimator = new PlaneEstimator(graphDisplay);
+	planeEstimator = new PlaneEstimator(this);
 
 	KFcurrent = 0;
 	KFLastPCSeq = -1;
@@ -176,8 +176,8 @@ void PointCloudViewer::updateProjectionMatrix(double fx, double fy, double cx, d
 	camProjectionMatrix(1, 1) = 2 * fy / height;
 	camProjectionMatrix(1, 2) = -(height-2*cy)/height;
 
-	camProjectionMatrix(2, 2) = 1;
-	camProjectionMatrix(2, 3) = 0;
+	camProjectionMatrix(2, 2) = FX1; //(-camera()->zNear() - camera()->zFar())/(camera()->zFar() - camera()->zNear());
+	camProjectionMatrix(2, 3) = FY1; //(-2 * camera()->zNear() * camera()->zFar())/(camera()->zFar() - camera()->zNear());
 	camProjectionMatrix(3, 2) = -1;
 
 }
@@ -272,9 +272,9 @@ void PointCloudViewer::draw() {
 	if (showCurrentPointcloud)
 		currentCamDisplay->drawPC(pointTesselation, 1);
 
-	graphDisplay->draw();
-
-	planeEstimator->draw();
+//	graphDisplay->draw();
+//
+//	planeEstimator->draw();
 
 	glPopMatrix();
 

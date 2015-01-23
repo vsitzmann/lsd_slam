@@ -179,6 +179,8 @@ public:
 	Eigen::Matrix <double, 4, 4, Eigen::ColMajor> camProjectionMatrix;
 	Eigen::Matrix <double, 4, 4, Eigen::ColMajor> modelViewMatrix;
 
+	bool resetRequested;
+
 protected :
 	virtual void draw();
 	virtual void init();
@@ -203,7 +205,7 @@ private:
 
 
 	void setToVideoSize();
-	bool resetRequested;
+
 
 	// for saving stuff
 	std::string save_folder;
