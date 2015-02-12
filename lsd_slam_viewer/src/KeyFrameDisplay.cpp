@@ -137,6 +137,7 @@ void KeyFrameDisplay::refreshPC()
 
 	// make data
 	MyVertex* tmpBuffer = new MyVertex[width*height];
+	keyframePointcloud.clear();
 
 	my_scaledTH =scaledDepthVarTH;
 	my_absTH = absDepthVarTH;
@@ -193,6 +194,9 @@ void KeyFrameDisplay::refreshPC()
 			tmpBuffer[vertexBufferNumPoints].color[2] = originalInput[x+y*width].color[0];
 			tmpBuffer[vertexBufferNumPoints].color[1] = originalInput[x+y*width].color[1];
 			tmpBuffer[vertexBufferNumPoints].color[0] = originalInput[x+y*width].color[2];
+
+			Eigen::Vector3f pt = camToWorld * (Eigen::Vector3f((x * fxi + cxi), (y * fyi + cyi), 1) * depth);
+			keyframePointcloud.push_back(pt);
 
 			vertexBufferNumPoints++;
 			displayed++;
@@ -388,8 +392,6 @@ void KeyFrameDisplay::drawPC(float pointSize, float alpha)
 	glPopMatrix();
 
 
-
-
 	if(alpha < 1)
 	{
 		glDisable(GL_BLEND);
@@ -397,5 +399,11 @@ void KeyFrameDisplay::drawPC(float pointSize, float alpha)
 		LightColor[2] = LightColor[1] = LightColor[0] = 1;
 		glLightfv (GL_LIGHT0, GL_AMBIENT_AND_DIFFUSE, LightColor);
 	}
+}
+
+
+/**** Get/Set Functions ****/
+std::vector<Eigen::Vector3f> * KeyFrameDisplay::getKeyframePointcloud(){
+	return &keyframePointcloud;
 }
 

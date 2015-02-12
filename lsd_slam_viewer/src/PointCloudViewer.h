@@ -29,14 +29,19 @@
 #include "qevent.h"
 #include "lsd_slam_viewer/keyframeMsg.h"
 #include "lsd_slam_viewer/keyframeGraphMsg.h"
+#include "PlaneEstimator.h"
+#include "ARObject.h"
 
 #include "QGLViewer/keyFrameInterpolator.h"
+#include "Eigen/Core"
+#include "sophus/sim3.hpp"
 
 class QApplication;
 
 class KeyFrameGraphDisplay;
 class CameraDisplay;
 class KeyFrameDisplay;
+class PlaneEstimator;
 
 #include "settings.h"
 
@@ -160,6 +165,12 @@ public:
 	void addFrameMsg(lsd_slam_viewer::keyframeMsgConstPtr msg);
 	void addGraphMsg(lsd_slam_viewer::keyframeGraphMsgConstPtr msg);
 
+	//Get/Set functions
+	KeyFrameGraphDisplay * getGraphDisplay();
+	Eigen::Matrix4f getProjectionMatrix();
+	Eigen::Matrix4f getModelViewMatrix();
+	void setARObject(ARObject * arObject);
+	void setPlaneEstimator(PlaneEstimator * planeEstimator);
 
 protected :
 	virtual void draw();
@@ -172,6 +183,8 @@ protected :
 
 
 private:
+	bool drawPlane;
+	bool drawARObject;
 
 	// displays kf-graph
 	KeyFrameGraphDisplay* graphDisplay;
@@ -179,7 +192,10 @@ private:
 	// displays only current keyframe (which is not yet in the graph).
 	KeyFrameDisplay* currentCamDisplay;
 
-
+	// Holds projection and modelview matrix of camera perspective
+	Eigen::Matrix4f modelView, projection;
+	PlaneEstimator * planeEstimator;
+	ARObject * arObject;
 
 	// meddle mutex
 	boost::mutex meddleMutex;
@@ -217,12 +233,12 @@ private:
 	double animationPlaybackTime;
 	int animationPlaybackID;
 
-
-
 	double lastAnimTime;
 
-
 	void remakeAnimation();
+	void updateModelViewMatrix(Sophus::Sim3f camToWorld);
+	void updateProjectionMatrix(float fx, float fy, float cx, float cy, float width, float height);
+
 };
 
 

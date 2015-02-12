@@ -63,7 +63,7 @@ public:
 	void addMsg(lsd_slam_viewer::keyframeMsgConstPtr msg);
 	void addGraphMsg(lsd_slam_viewer::keyframeGraphMsgConstPtr msg);
 
-
+	std::vector<KeyFrameDisplay*> & getKeyframes();
 
 	bool flushPointcloud;
 	bool printNumbers;

@@ -45,3 +45,6 @@ int numRefreshedAlready = 0;
 
 // cut-off after this
 double lastFrameTime = 1e15;
+
+bool drawInlier = true;
+float ransacTolerance = 0.025;

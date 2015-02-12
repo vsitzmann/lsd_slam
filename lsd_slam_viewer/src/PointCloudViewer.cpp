@@ -42,6 +42,9 @@
 #include <iostream>
 #include <fstream>
 
+#include <sophus/sim3.hpp>
+#include <Eigen/Core>
+
 PointCloudViewer::PointCloudViewer()
 {
 	setPathKey(Qt::Key_0,0);
@@ -58,6 +61,9 @@ PointCloudViewer::PointCloudViewer()
 
 	currentCamDisplay = 0;
 	graphDisplay = 0;
+	planeEstimator = 0;
+
+	drawPlane = false;
 
 
 	for(int i=0;i<10;i++)
@@ -88,6 +94,8 @@ void PointCloudViewer::reset()
 		delete currentCamDisplay;
 	if(graphDisplay != 0)
 		delete graphDisplay;
+
+	drawPlane = false;
 
 	currentCamDisplay = new KeyFrameDisplay();
 	graphDisplay = new KeyFrameGraphDisplay();
@@ -132,11 +140,52 @@ void PointCloudViewer::addFrameMsg(lsd_slam_viewer::keyframeMsgConstPtr msg)
 		currentCamDisplay->setFrom(msg);
 		lastAnimTime = lastCamTime = msg->time;
 		lastCamID = msg->id;
+
+		Sophus::Sim3f camToWorld;
+
+		// copy over campose.
+		memcpy(camToWorld.data(), msg->camToWorld.data(), 7*sizeof(float));
+
+		updateModelViewMatrix(camToWorld);
+		updateProjectionMatrix(msg->fx, msg->fy, msg->cx, msg->cy, msg->width, msg->height);
 	}
 	else
 		graphDisplay->addMsg(msg);
 
 	meddleMutex.unlock();
+}
+
+void PointCloudViewer::updateModelViewMatrix(Sophus::Sim3f camToWorld){
+	Sophus::Sim3f w2c = camToWorld;
+	w2c.setScale(1);
+	w2c = w2c.inverse();
+	modelView = w2c.matrix().cast<float>();
+
+	Eigen::Matrix4f transMatrix = Eigen::Matrix4f::Identity();
+	transMatrix(1, 1) = -1;
+	transMatrix(2, 2) = -1;
+
+	modelView = transMatrix * modelView;
+}
+
+void PointCloudViewer::updateProjectionMatrix(float fx, float fy, float cx, float cy, float width, float height){
+	projection = Eigen::Matrix4f::Zero();
+
+	//Calculate camProjectionMatrix following the instructions from
+	//http://www.scratchapixel.com/old/lessons/3d-advanced-lessons/perspective-and-orthographic-projection-matrix/opengl-perspective-projection-matrix/
+	//The matrix is loaded in the draw()-function, since the setFromProjectionMatrix() and loadProjectionMatrix()-Functions
+	//didn't seem to work.
+
+	projection(0, 0) = 2 * fx/width;
+	projection(0, 2) = (width-2*cx)/width;
+
+	projection(1, 1) = 2 * fy / height;
+	projection(1, 2) = -(height-2*cy)/height;
+
+	projection(2, 2) = (-0.1 - 100)/(100 - 0.1); //(-camera()->zNear() - camera()->zFar())/(camera()->zFar() - camera()->zNear());
+	projection(2, 3) = (-2 * 0.1 * 100)/(100 - 0.1);//(-2 * camera()->zNear() * camera()->zFar())/(camera()->zFar() - camera()->zNear());
+	projection(3, 2) = -1;
+
 }
 
 void PointCloudViewer::addGraphMsg(lsd_slam_viewer::keyframeGraphMsgConstPtr msg)
@@ -239,6 +288,12 @@ void PointCloudViewer::draw()
 
 
 	graphDisplay->draw();
+
+	if(drawPlane)
+		planeEstimator->draw();
+
+	if(drawARObject)
+		arObject->draw();
 
 
 	glPopMatrix();
@@ -427,4 +482,29 @@ void PointCloudViewer::keyPressEvent(QKeyEvent *e)
     	  break;
     }
   }
+
+/**** Get Functions ****/
+KeyFrameGraphDisplay * PointCloudViewer::getGraphDisplay(){
+	return graphDisplay;
+}
+
+Eigen::Matrix4f PointCloudViewer::getProjectionMatrix(){
+	return projection;
+}
+
+Eigen::Matrix4f PointCloudViewer::getModelViewMatrix(){
+	return modelView;
+}
+
+void PointCloudViewer::setPlaneEstimator(PlaneEstimator * planeEstimator){
+	this->planeEstimator = planeEstimator;
+	drawPlane = true;
+}
+
+void PointCloudViewer::setARObject(ARObject * arObject){
+	this->arObject = arObject;
+	drawARObject = true;
+}
+
+
 

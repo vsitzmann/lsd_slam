@@ -51,15 +51,13 @@ public:
 	KeyFrameDisplay();
 	~KeyFrameDisplay();
 
-
 	void setFrom(lsd_slam_viewer::keyframeMsgConstPtr msg);
 	void drawCam(float lineWidth = 1, float* color = 0);
 	void drawPC(float pointSize = 1, float alpha = 1);
 	void refreshPC();
+	std::vector<Eigen::Vector3f> * getKeyframePointcloud();
 
 	int flushPC(std::ofstream* f);
-
-
 
 	int id;
 	double time;
@@ -91,9 +89,10 @@ private:
 	GLuint vertexBufferId;
 	int vertexBufferNumPoints;
 
-
 	bool vertexBufferIdValid;	// true if the vertixBufferID is valid (doesnt mean the data in there is still valid)
 	bool glBuffersValid;		// true if the vertexBufferID contains valid data
+
+	std::vector<Eigen::Vector3f> keyframePointcloud;
 
 };
 

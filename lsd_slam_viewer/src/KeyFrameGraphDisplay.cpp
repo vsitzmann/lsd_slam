@@ -206,3 +206,8 @@ void KeyFrameGraphDisplay::addGraphMsg(lsd_slam_viewer::keyframeGraphMsgConstPtr
 
 //	printf("graph update: %d constraints, %d poses\n", msg->numConstraints, msg->numFrames);
 }
+
+/**** Get Functions ****/
+std::vector<KeyFrameDisplay *> & KeyFrameGraphDisplay::getKeyframes(){
+	return keyframes;
+}

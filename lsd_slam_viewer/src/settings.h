@@ -41,3 +41,6 @@ extern bool saveAllVideo;
 extern int numRefreshedAlready;
 
 extern double lastFrameTime;
+
+extern bool drawInlier;
+extern float ransacTolerance;

@@ -8,7 +8,7 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  Release        : w/o debug symbols, w/ optimization
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-set(ROS_BUILD_TYPE Release)
+set(ROS_BUILD_TYPE RelWithDebInfo)
 
 rosbuild_init()
 
@@ -30,7 +30,7 @@ include(${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)
 gencfg()
 
 
-
+set(GL_LIBRARY GL GLU X11)
 
 
 # Messages & Services
@@ -40,7 +40,7 @@ rosbuild_genmsg()
 # SSE flags
 rosbuild_check_for_sse()
 set(CMAKE_CXX_FLAGS
-   "${SSE_FLAGS}"
+   "${SSE_FLAGS} -std=c++0x"
 )
 
 # SSE Sources files
@@ -49,6 +49,9 @@ set(SOURCE_FILES
   src/KeyFrameDisplay.cpp
   src/KeyFrameGraphDisplay.cpp
   src/settings.cpp
+  src/ARViewer.cpp
+  src/ARObject.cpp
+  src/PlaneEstimator.cpp
 )
 
 set(HEADER_FILES     
@@ -56,6 +59,9 @@ set(HEADER_FILES
   src/KeyFrameDisplay.h
   src/KeyFrameGraphDisplay.h
   src/settings.h
+  src/ARViewer.h
+  src/ARObject.h
+  src/PlaneEstimator.h
 )
 
 include_directories(

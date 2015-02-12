@@ -18,6 +18,7 @@
 * along with dvo. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "ARViewer.h"
 
 #include "ros/ros.h"
 #include "boost/thread.hpp"
@@ -38,6 +39,7 @@
 #include "rosbag/query.h"
 #include "rosbag/view.h"
 
+#include <image_transport/image_transport.h>
 
 PointCloudViewer* viewer = 0;
 
@@ -63,6 +65,8 @@ void dynConfCb(lsd_slam_viewer::LSDSLAMViewerParamsConfig &config, uint32_t leve
 	cutFirstNKf = config.cutFirstNKf;
 
 	saveAllVideo = config.saveAllVideo;
+	ransacTolerance = config.ransacTolerance;
+	drawInlier = config.drawInlier;
 
 }
 
@@ -71,6 +75,8 @@ void frameCb(lsd_slam_viewer::keyframeMsgConstPtr msg)
 
 	if(msg->time > lastFrameTime) return;
 
+	popImage(msg->id);
+
 	if(viewer != 0)
 		viewer->addFrameMsg(msg);
 }
@@ -78,6 +84,11 @@ void graphCb(lsd_slam_viewer::keyframeGraphMsgConstPtr msg)
 {
 	if(viewer != 0)
 		viewer->addGraphMsg(msg);
+}
+
+void imageCallback(const sensor_msgs::ImageConstPtr& msg)
+{
+	enqueueImage(msg);
 }
 
 
@@ -100,6 +111,10 @@ void rosThreadLoop( int argc, char** argv )
 	ros::Subscriber liveFrames_sub = nh.subscribe(nh.resolveName("lsd_slam/liveframes"),1, frameCb);
 	ros::Subscriber keyFrames_sub = nh.subscribe(nh.resolveName("lsd_slam/keyframes"),20, frameCb);
 	ros::Subscriber graph_sub       = nh.subscribe(nh.resolveName("lsd_slam/graph"),10, graphCb);
+
+	image_transport::ImageTransport it(nh);
+	image_transport::Subscriber sub = it.subscribe("/image_raw", 1, imageCallback);
+
 
 	ros::spin();
 
@@ -152,14 +167,12 @@ void rosFileLoop( int argc, char** argv )
 int main( int argc, char** argv )
 {
 
-
 	printf("Started QApplication thread\n");
 	// Read command lines arguments.
 	QApplication application(argc,argv);
 
 	// Instantiate the viewer.
 	viewer = new PointCloudViewer();
-
 
 	#if QT_VERSION < 0x040000
 		// Set the viewer as the application main widget.
@@ -183,6 +196,7 @@ int main( int argc, char** argv )
 		rosThread = boost::thread(rosThreadLoop, argc, argv);
 	}
 
+	displayThreadLoop(&application, viewer);
 
 	application.exec();
 
