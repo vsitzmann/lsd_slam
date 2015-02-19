@@ -30,6 +30,7 @@ public:
 
 	void beginPlaneTracking();
 	Eigen::Matrix4f getPlaneParameters();
+	void createCollisionMap();
 
 private:
 	/**** Functions ****/
@@ -52,6 +53,7 @@ private:
 	unsigned int planeBufferId;
 	unsigned int inlierBufferId;
 	unsigned int lastUpdateFrame;
+	Eigen::Vector4f cameraViewDirection;
 
 	std::vector<Eigen::Vector3f> plane_vertices;
 
@@ -67,8 +69,9 @@ private:
 	std::vector<Eigen::Vector3f> ransac(const std::vector<KeyFrameDisplay*> &keyframeDisplays, const int iterations, const float inlierDistance);
 	Eigen::Vector4f calcPlaneParams(Eigen::Vector3f P1, Eigen::Vector3f P2, Eigen::Vector3f P3);
 	void calcHessianParameters(Eigen::Vector3f P1, Eigen::Vector3f P2, Eigen::Vector3f P3, Eigen::Vector3f &normal, float &planeOriginDis);
-
-
+	double calcPlanePointDis(Eigen::Vector3f planeNormal, float planeOriginDis, Eigen::Vector3f P);
+	void selfOrganizingMap(const std::vector<KeyFrameDisplay*> &keyframeDisplays);
+	Eigen::Vector2f getClosestIndex(const std::vector< std::vector <Eigen::Vector3f> > pointCloud, Eigen::Vector3f point);
 
 	template <typename Derived> static Eigen::Matrix3f pcaPlaneFitting(Eigen::MatrixBase<Derived> &mat, Eigen::Vector3f &tangent, Eigen::Vector3f &bitangent, Eigen::Vector3f &center){
 		center = mat.colwise().mean().transpose();

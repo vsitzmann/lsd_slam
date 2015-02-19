@@ -33,6 +33,7 @@
 #include "lsd_slam_viewer/keyframeGraphMsg.h"
 #include "lsd_slam_viewer/keyframeMsg.h"
 
+#include <cv_bridge/cv_bridge.h>
 
 #include "boost/foreach.hpp"
 #include "rosbag/bag.h"
@@ -75,7 +76,7 @@ void frameCb(lsd_slam_viewer::keyframeMsgConstPtr msg)
 
 	if(msg->time > lastFrameTime) return;
 
-	popImage(msg->id);
+//	popImage(msg->id);
 
 	if(viewer != 0)
 		viewer->addFrameMsg(msg);
@@ -88,7 +89,11 @@ void graphCb(lsd_slam_viewer::keyframeGraphMsgConstPtr msg)
 
 void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-	enqueueImage(msg);
+//	enqueueImage(msg);
+
+	cv::Mat image =  cv_bridge::toCvShare(msg, "rgb8")->image;
+
+	displayImage("AR Demo", image, false);
 }
 
 

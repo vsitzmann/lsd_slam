@@ -22,7 +22,18 @@
 
 #include "settings.h"
 
+#include <cstdio>
+#include <ctime>
+
 using namespace std;
+
+int accelerationDirection = 0;
+
+double maxVelocity = 0.025;
+double acceleration = 0.05;
+double velocity = 0;
+
+std::clock_t lastDrawTime = 0;
 
 ARObject::ARObject() {
 	load_obj("/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/resources/teacup_2.obj");
@@ -39,8 +50,15 @@ void ARObject::setPose(Eigen::Matrix4f initialPose){
 	this->currentPose = initialPose;
 }
 
+Eigen::Matrix4f ARObject::getPose(){
+	return this->currentPose;
+}
+
 void ARObject::draw(){
 	glMatrixMode(GL_MODELVIEW);
+
+	updatePosition((std::clock()-lastDrawTime)/ (double) CLOCKS_PER_SEC);
+	lastDrawTime = std::clock();
 
 	glGenBuffers(1, &vbo_mesh_vertices);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo_mesh_vertices);
@@ -184,4 +202,23 @@ void ARObject::load_obj(const char* filename) {
     Eigen::Vector3f normal = cross.normalized();
     normals[ia] = normals[ib] = normals[ic] = normal;
   }
+}
+
+void ARObject::accelerate(int direction){
+	accelerationDirection = direction;
+}
+
+void ARObject::stop(){
+	accelerationDirection = 0;
+	velocity = 0;
+}
+
+void ARObject::updatePosition(double deltaT){
+	velocity += deltaT * acceleration * accelerationDirection;
+
+	if(velocity>maxVelocity) velocity=maxVelocity;
+	if(velocity<maxVelocity/10000) velocity = 0;
+
+	currentPose.col(3) += currentPose.col(0) * velocity;
+
 }

@@ -63,10 +63,11 @@ void displayThreadLoop(QApplication* app, PointCloudViewer * viewer)
 {
 
 	_viewer = viewer;
-	ARViewer* window = 0;
+	ARViewer* window = new ARViewer("AR Viewer", 0, viewer);
 
 	printf("started image display thread!\n");
 	boost::unique_lock<boost::mutex> lock(openCVdisplayMutex);
+
 	while(imageThreadKeepRunning)
 	{
 		lock.unlock();
@@ -79,16 +80,8 @@ void displayThreadLoop(QApplication* app, PointCloudViewer * viewer)
 
 		while(displayQueue.size() > 0)
 		{
-			if(window!=0)
-			{
-				window->loadImage(displayQueue.front().img, displayQueue.front().autoSize);
-				window->show();
-			} else
-			{
-				window = new ARViewer(displayQueue.front().name, 0, viewer);
-				window->loadImage(displayQueue.front().img, displayQueue.front().autoSize);
-				window->show();
-			}
+			window->loadImage(displayQueue.front().img, displayQueue.front().autoSize);
+			window->show();
 			displayQueue.pop();
 		}
 	}
@@ -195,6 +188,8 @@ ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * viewer)
 ARViewer::~ARViewer()
 {
     if(image != 0) delete[] image;
+    delete[] arObject;
+    delete[] planeEstimator;
 }
 
 void ARViewer::initializeGL()
@@ -347,10 +342,10 @@ void ARViewer::keyPressEvent(QKeyEvent *ke)
 
 			break;
 		case Qt::Key_Up:
-			arObject->moveStraight(1);
+			arObject->accelerate(1);
 			break;
 		case Qt::Key_Down:
-			arObject->moveStraight(-1);
+			arObject->accelerate(-1);
 			break;
 		case Qt::Key_Left:
 			arObject->rotate(1);
@@ -367,4 +362,25 @@ void ARViewer::keyPressEvent(QKeyEvent *ke)
 	lastKey = ke->key();
 	keyPressCondition.notify_one();
 }
+
+void ARViewer::keyReleaseEvent(QKeyEvent *ke){
+
+	switch(ke->key()){
+		case Qt::Key_Up:
+			if(ke->isAutoRepeat()) return;
+			arObject->accelerate(0);
+			break;
+		case Qt::Key_Down:
+			if(ke->isAutoRepeat()) return;
+			arObject->accelerate(0);
+			break;
+		case Qt::Key_Left:
+			break;
+		case Qt::Key_Right:
+			break;
+		case Qt::Key_F:
+			break;
+	}
+}
+
 

@@ -38,6 +38,7 @@ protected:
     void paintGL();
 
     void keyPressEvent(QKeyEvent *ke);
+    void keyReleaseEvent(QKeyEvent *ke);
 public:
     void loadImage(cv::Mat m, bool resize=false);
     void setPointCloudViewerPointer(PointCloudViewer * viewer);

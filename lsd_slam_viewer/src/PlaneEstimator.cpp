@@ -104,17 +104,19 @@ void PlaneEstimator::draw() {
 
 		glPopMatrix();
 
-		glEnableClientState(GL_VERTEX_ARRAY);
+		if(drawInlier){
+			glEnableClientState(GL_VERTEX_ARRAY);
 
-			glPointSize(1);
-			glBindBuffer(GL_ARRAY_BUFFER, inlierBufferId);
-			glVertexPointer(3, GL_FLOAT, sizeof(Eigen::Vector3f), 0);
-			glColor3f(0, 0, 1);
-			glDrawArrays(GL_POINTS, 0, inliers.size());
+				glPointSize(1);
+				glBindBuffer(GL_ARRAY_BUFFER, inlierBufferId);
+				glVertexPointer(3, GL_FLOAT, sizeof(Eigen::Vector3f), 0);
+				glColor3f(0, 0, 1);
+				glDrawArrays(GL_POINTS, 0, inliers.size());
 
-			glDisableClientState(GL_VERTEX_ARRAY);
+				glDisableClientState(GL_VERTEX_ARRAY);
 
-			glColor3f(1, 1, 1);
+				glColor3f(1, 1, 1);
+		}
 
 
 		glDeleteBuffers(1, &planeBufferId);
@@ -185,6 +187,7 @@ std::vector<Eigen::Vector3f> PlaneEstimator::ransac(const std::vector<KeyFrameDi
 	double bestPoints[3] = {0};
 	Eigen::Vector3f planeNormal;
 	float planeOriginDis;
+	Eigen::Vector4f planeParams;
 
 	for (int i=0; i < iterations; i++)
 	{
@@ -215,7 +218,7 @@ std::vector<Eigen::Vector3f> PlaneEstimator::ransac(const std::vector<KeyFrameDi
 		while(j < absolutePointNumber){
 			// calculate distance between point and plane
 			P = globalPointCloud[j];
-			dis = std::abs(planeNormal.dot(P) + planeOriginDis);
+			dis = calcPlanePointDis(planeNormal, planeOriginDis, P);
 
 			if (dis < inlierDistance){
 				inlier++;
@@ -241,7 +244,7 @@ std::vector<Eigen::Vector3f> PlaneEstimator::ransac(const std::vector<KeyFrameDi
 	for (int j = 0; j < absolutePointNumber; j++) {
 		// calculate distance between point and plane
 		P = globalPointCloud[j];
-		double dis = std::abs(planeNormal.dot(P) + planeOriginDis);
+		double dis = calcPlanePointDis(planeNormal, planeOriginDis, P);
 
 		if (dis < inlierDistance){
 			inliers.push_back(globalPointCloud[j]);
@@ -252,14 +255,86 @@ std::vector<Eigen::Vector3f> PlaneEstimator::ransac(const std::vector<KeyFrameDi
 	return inliers;
 }
 
+void PlaneEstimator::selfOrganizingMap(const std::vector<KeyFrameDisplay*> &keyframeDisplays){
+	int absolutePointNumber = 0;
+
+	std::vector<Eigen::Vector3f> inliers;
+
+	for(unsigned int i=0;i<keyframeDisplays.size();i++)
+	{
+		absolutePointNumber+=keyframeDisplays[i]->getKeyframePointcloud()->size();
+	}
+
+	std::vector<Eigen::Vector3f> globalPointCloud;
+	globalPointCloud.reserve(absolutePointNumber);
+
+	for(unsigned int i =0; i<keyframeDisplays.size(); i++)
+	{
+		globalPointCloud.insert(globalPointCloud.end(), keyframeDisplays[i]->getKeyframePointcloud()->begin(), keyframeDisplays[i]->getKeyframePointcloud()->end());
+	}
+
+	std::vector< std::vector<Eigen::Vector3f> > kohonenNet;
+	kohonenNet.reserve(2000);
+
+	for(int i = 0; i<2000; i++){
+
+	}
+
+	int trainIndex = 0;
+	int cooperationRadius = kohonenNet.size()/10;
+	Eigen::Vector2f winnerIndices (0,0);
+	float distance = 0;
+
+	for(int i = 0; i<10000; i++){
+		//Choose point from pointcloud at random.
+		trainIndex = rand()%(absolutePointNumber);
+
+		//Get the index of the closest neuron.
+		winnerIndices = getClosestIndex(kohonenNet, globalPointCloud[trainIndex]);
+
+		for(int i = 0; i<cooperationRadius; i++){
+			for(int j = 0; j<cooperationRadius; j++){
+
+
+			}
+		}
+	}
+
+
+}
+
+Eigen::Vector2f PlaneEstimator::getClosestIndex(const std::vector< std::vector <Eigen::Vector3f> > pointCloud, Eigen::Vector3f point){
+	float minDistance = 10000;
+	Eigen::Vector2f minCoordinates (0,0);
+	float distance = 0;
+
+	for(unsigned int i = 0; i<pointCloud.size(); i++){
+		for(unsigned int j = 0; j<pointCloud[i].size(); j++){
+			distance = (point-pointCloud[i][j]).norm();
+
+			if(distance<minDistance){
+				minCoordinates(0) = i;
+				minCoordinates(1) = j;
+
+				minDistance = distance;
+			}
+		}
+	}
+
+	return minCoordinates;
+}
+
 void PlaneEstimator::calcHessianParameters(Eigen::Vector3f P1, Eigen::Vector3f P2, Eigen::Vector3f P3, Eigen::Vector3f &normal, float &planeOriginDis){
 	normal = (P2 - P1).cross(P3 - P1).normalized();
+
+	if(normal.dot(P1)<0) normal *= -1;
+
 	planeOriginDis = P1.dot(normal);
 }
 
 void PlaneEstimator::refreshPlane(){
 	if(viewer->getGraphDisplay()->getKeyframes().empty()) return;
-	if(viewer->getGraphDisplay()->getKeyframes().size() == lastUpdateFrame) return;
+//	if(viewer->getGraphDisplay()->getKeyframes().size() == lastUpdateFrame) return;
 
 	lastUpdateFrame = viewer->getGraphDisplay()->getKeyframes().size();
 
@@ -280,7 +355,7 @@ void PlaneEstimator::refreshPlane(){
 	std::vector<Eigen::Vector3f> inliers;
 
 	for(unsigned int i = 0; i<keyframePointcloud->size(); i++){
-		dis = std::abs(planeNormal.dot( (*keyframePointcloud)[i] ) + planeOriginDis);
+		dis = calcPlanePointDis(planeNormal, planeOriginDis, (*keyframePointcloud)[i]);
 
 		if(dis < ransacTolerance){
 			inliers.push_back((*keyframePointcloud)[i]);
@@ -333,4 +408,24 @@ void PlaneEstimator::refreshPlane(){
 // Get/Set functions
 Eigen::Matrix4f PlaneEstimator::getPlaneParameters(){
 	return planeMatrix;
+}
+
+double PlaneEstimator::calcPlanePointDis(Eigen::Vector3f planeNormal, float planeOriginDis, Eigen::Vector3f P){
+	return std::abs(planeNormal.dot(P) - planeOriginDis);
+}
+
+Eigen::Vector4f PlaneEstimator::calcPlaneParams(Eigen::Vector3f P1, Eigen::Vector3f P2, Eigen::Vector3f P3){
+	Eigen::Vector4f buffer1;
+
+	buffer1[0] = P1[1] * (P2[2] - P3[2]) + P2[1] * (P3[2] - P1[2]) + P3[1] * (P1[2] - P2[2]);
+	buffer1[1] = P1[2] * (P2[0] - P3[0]) + P2[2] * (P3[0] - P1[0]) + P3[2] * (P1[0] - P2[0]);
+	buffer1[2] = P1[0] * (P2[1] - P3[1]) + P2[0] * (P3[1] - P1[1]) + P3[0] * (P1[1] - P2[1]);
+	buffer1[3] = -(P1[0] * (P2[1] * P3[2] - P3[1] * P2[2]) + P2[0] * (P3[1] * P1[2] - P1[1] * P3[2]) + P3[0] * (P1[1] * P2[2] - P2[1] * P1[2]));
+
+	return buffer1;
+}
+
+void PlaneEstimator::createCollisionMap(){
+
+
 }

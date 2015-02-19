@@ -27,6 +27,9 @@ public:
 	void flipNormal();
 	void setPose(Eigen::Matrix4f initialPose);
 	void setNormal(Eigen::Matrix4f planeParameters);
+	void accelerate(int direction);
+	void stop();
+	Eigen::Matrix4f getPose();
 
 private:
 	Eigen::Matrix <float, 4, 4, Eigen::ColMajor> currentPose;
@@ -42,6 +45,7 @@ private:
 	unsigned int vbo_mesh_vertices, vbo_mesh_normals, ibo_mesh_elements, vbo_mesh_colors;
 
 	void load_obj(const char* filename);
+	void updatePosition(double deltaT);
 };
 
 #endif /* SRC_AROBJECT_H_ */
