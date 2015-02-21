@@ -96,9 +96,12 @@ private:
 
 private:
 	std::vector<Eigen::Vector3f> ransac(const std::vector<KeyFrameDisplay*> &keyframeDisplays, const int iterations, const float inlierDistance);
+	std::vector<Eigen::Vector3f> qdegsac(const std::vector<Eigen::Vector3f> pointcloud, int iterations, float inlierTolerance);
+	int twoDimRansac(std::vector<Eigen::Vector3f> pointcloud, int iterations, float inlierTolerance);
 	Eigen::Vector4f calcPlaneParams(Eigen::Vector3f P1, Eigen::Vector3f P2, Eigen::Vector3f P3);
 	void calcHessianParameters(Eigen::Vector3f P1, Eigen::Vector3f P2, Eigen::Vector3f P3, Eigen::Vector3f &normal, float &planeOriginDis);
 	double calcPlanePointDis(Eigen::Vector3f planeNormal, float planeOriginDis, Eigen::Vector3f P);
+	float distanceLinePoint(Eigen::Vector3f planePoint1, Eigen::Vector3f planePoint2, Eigen::Vector3f otherPoint);
 	void selfOrganizingMap(const std::vector<KeyFrameDisplay*> &keyframeDisplays);
 	int getClosestIndices(std::vector<Eigen::Vector3f> kohonenNet, Eigen::Vector3f point);
 	void drawKohonenNet();

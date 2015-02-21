@@ -69,7 +69,7 @@ void PlaneEstimator::generatePlaneVBOs(){
 void PlaneEstimator::draw() {
 
 	if(planeTracking){
-		refreshPlane();
+//		refreshPlane();
 
 		planeBufferId = 0;
 		glGenBuffers(1, &planeBufferId);
@@ -301,6 +301,123 @@ std::vector<Eigen::Vector3f> PlaneEstimator::ransac(const std::vector<KeyFrameDi
 	return inliers;
 }
 
+std::vector<Eigen::Vector3f> PlaneEstimator::qdegsac(const std::vector<Eigen::Vector3f> pointcloud, int iterations, float inlierTolerance){
+	std::vector<Eigen::Vector3f> inliers;
+
+	unsigned int maxInliers = 0;
+	int pos1, pos2, pos3;
+	Eigen::Vector3f P1, P2, P3, P;
+	double dis;
+	double bestPoints[3] = {0};
+	Eigen::Vector3f planeNormal;
+	float planeOriginDis;
+	Eigen::Vector4f planeParams;
+
+	for (int i=0; i < iterations; i++)
+	{
+		// get Random Points
+		pos1 = rand() % pointcloud.size();
+		pos2 = rand() % pointcloud.size();
+		pos3 = rand() % pointcloud.size();
+
+		// ensure all points are different
+		while (pos1 == pos2 || pos2 == pos3 || pos1 == pos3) {
+			pos1 = rand() % pointcloud.size();
+			pos2 = rand() % pointcloud.size();
+			pos3 = rand() % pointcloud.size();
+		}
+
+		P1 = pointcloud[pos1];
+		P2 = pointcloud[pos2];
+		P3 = pointcloud[pos3];
+
+		calcHessianParameters(P1, P2, P3, planeNormal, planeOriginDis);
+
+		int j = 0;
+
+		while(j < pointcloud.size()){
+			// calculate distance between point and plane
+			P = pointcloud[j];
+			dis = calcPlanePointDis(planeNormal, planeOriginDis, P);
+
+			if (dis < inlierTolerance){
+				inliers.push_back(P);
+			}
+
+			j+=1;
+		}
+
+		if (inliers.size() > maxInliers & ((float)inliers.size()/(float)twoDimRansac(inliers, iterations, inlierTolerance))>2) {
+			maxInliers = inliers.size();
+			bestPoints[0] = pos1;
+			bestPoints[1] = pos2;
+			bestPoints[2] = pos3;
+		}
+	}
+
+	P1 = pointcloud[bestPoints[0]];
+	P2 = pointcloud[bestPoints[1]];
+	P3 = pointcloud[bestPoints[2]];
+
+	calcHessianParameters(P1, P2, P3, planeNormal, planeOriginDis);
+
+	for (int j = 0; j < pointcloud.size(); j++) {
+		// calculate distance between point and plane
+		P = pointcloud[j];
+		double dis = calcPlanePointDis(planeNormal, planeOriginDis, P);
+
+		if (dis < inlierTolerance){
+			inliers.push_back(pointcloud[j]);
+		}
+	}
+
+	return inliers;
+}
+
+int PlaneEstimator::twoDimRansac(std::vector<Eigen::Vector3f> pointcloud, int iterations, float inlierTolerance){
+	int maxInliers = 0, inlier = 0;
+	int pos1, pos2;
+	Eigen::Vector3f P1, P2, P;
+	double dis;
+
+	for (int i=0; i < iterations; i++)
+	{
+		// get Random Points
+		pos1 = rand() % pointcloud.size();
+		pos2 = rand() % pointcloud.size();
+
+		// ensure all points are different
+		while (pos1 == pos2) {
+			pos1 = rand() % pointcloud.size();
+			pos2 = rand() % pointcloud.size();
+		}
+
+		P1 = pointcloud[pos1];
+		P2 = pointcloud[pos2];
+
+		inlier = 0;
+		int j = 0;
+
+		while(j < pointcloud.size()){
+			// calculate distance between point and plane
+			P = pointcloud[j];
+			dis = distanceLinePoint(P1, P2, P);
+
+			if (dis < inlierTolerance){
+				inlier++;
+			}
+
+			j+=1;
+		}
+
+		if (inlier > maxInliers) {
+			maxInliers = inlier;
+		}
+	}
+
+	return maxInliers;
+}
+
 void PlaneEstimator::selfOrganizingMap(const std::vector<KeyFrameDisplay*> &keyframeDisplays){
 
 	if(!kohonen){
@@ -412,6 +529,12 @@ void PlaneEstimator::calcHessianParameters(Eigen::Vector3f P1, Eigen::Vector3f P
 	if(normal.dot(P1)<0) normal *= -1;
 
 	planeOriginDis = P1.dot(normal);
+}
+
+float PlaneEstimator::distanceLinePoint(Eigen::Vector3f planePoint1, Eigen::Vector3f planePoint2, Eigen::Vector3f otherPoint){
+	Eigen::Vector3f cross = (otherPoint - planePoint1).cross(otherPoint - planePoint2);
+
+	return cross.norm()/(planePoint2 - planePoint1).norm();
 }
 
 void PlaneEstimator::refreshPlane(){
