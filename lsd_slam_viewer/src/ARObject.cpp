@@ -35,8 +35,10 @@ double velocity = 0;
 
 std::clock_t lastDrawTime = 0;
 
-ARObject::ARObject() {
+ARObject::ARObject(PlaneEstimator * planeEstimator) {
 	load_obj("/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/resources/teacup_2.obj");
+
+	this->planeEstimator = planeEstimator;
 
 	rotAngle = M_PI/20;
 	speed = 0.1;
@@ -50,8 +52,12 @@ void ARObject::setPose(Eigen::Matrix4f initialPose){
 	this->currentPose = initialPose;
 }
 
-Eigen::Matrix4f ARObject::getPose(){
-	return this->currentPose;
+void ARObject::setPlaneEstimator(PlaneEstimator * planeEstimator){
+	this->planeEstimator = planeEstimator;
+}
+
+Eigen::Matrix4f * ARObject::getPose(){
+	return &(this->currentPose);
 }
 
 void ARObject::draw(){
@@ -155,7 +161,9 @@ void ARObject::flipNormal(){
 }
 
 void ARObject::setNormal(Eigen::Matrix4f planeParameters){
-	currentPose.col(2) = currentPose.col(2).dot(planeParameters.col(2))*planeParameters.col(2);
+	currentPose.col(2) = (currentPose.col(2).dot(planeParameters.col(2))*planeParameters.col(2)).normalized();
+	currentPose.col(0) = (currentPose.col(0) - currentPose.col(0).dot(currentPose.col(2))*currentPose.col(2)).normalized();
+	currentPose.col(1) = (currentPose.col(1) - currentPose.col(1).dot(currentPose.col(2))*currentPose.col(2)).normalized();
 }
 
 void ARObject::load_obj(const char* filename) {
@@ -214,11 +222,19 @@ void ARObject::stop(){
 }
 
 void ARObject::updatePosition(double deltaT){
-	velocity += deltaT * acceleration * accelerationDirection;
+	if(accelerationDirection == 0 ){
+		if(velocity>0) velocity -= deltaT * acceleration;
+		else if(velocity<0 ) velocity += deltaT * acceleration;
 
-	if(velocity>maxVelocity) velocity=maxVelocity;
-	if(velocity<maxVelocity/10000) velocity = 0;
+		if(std::abs(velocity)<maxVelocity/100 ) velocity = 0;
+	} else{
+		velocity += deltaT * acceleration * accelerationDirection;
 
-	currentPose.col(3) += currentPose.col(0) * velocity;
+		if(velocity>maxVelocity) velocity=maxVelocity;
+	}
 
+	Eigen::Vector4f newPosition = currentPose.col(3)  + currentPose.col(0) * velocity;
+
+	if(!planeEstimator->checkCollision(newPosition)) currentPose.col(3) = newPosition;
+	else(stop());
 }

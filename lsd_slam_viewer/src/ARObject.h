@@ -9,14 +9,17 @@
 #define SRC_AROBJECT_H_
 
 #include <GL/glu.h>
+#include "PlaneEstimator.h"
 
 #include <Eigen/Core>
 
 using namespace std;
 
+class PlaneEstimator;
+
 class ARObject {
 public:
-	ARObject();
+	ARObject(PlaneEstimator * planeEstimator);
 	virtual ~ARObject();
 
 	void draw();
@@ -29,7 +32,8 @@ public:
 	void setNormal(Eigen::Matrix4f planeParameters);
 	void accelerate(int direction);
 	void stop();
-	Eigen::Matrix4f getPose();
+	Eigen::Matrix4f *getPose();
+	void setPlaneEstimator(PlaneEstimator * planeEstimator);
 
 private:
 	Eigen::Matrix <float, 4, 4, Eigen::ColMajor> currentPose;
@@ -38,6 +42,8 @@ private:
 	vector<Eigen::Vector3f> normals;
 	vector<Eigen::Vector3f> colors;
 	vector<GLushort> elements;
+
+	PlaneEstimator * planeEstimator;
 
 	float speed;
 	float rotAngle;

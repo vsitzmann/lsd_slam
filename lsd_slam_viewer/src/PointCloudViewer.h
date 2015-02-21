@@ -42,6 +42,7 @@ class KeyFrameGraphDisplay;
 class CameraDisplay;
 class KeyFrameDisplay;
 class PlaneEstimator;
+class ARObject;
 
 #include "settings.h"
 

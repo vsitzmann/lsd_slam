@@ -54,6 +54,7 @@ private:
     ARObject * arObject;
 
     bool arDemo;
+	bool ego;
     int width_img, height_img;
     unsigned char* image;
 };

@@ -14,19 +14,34 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 
+#include <ctime>
+
 #include "settings.h"
 
 typedef Eigen::Matrix<float,Eigen::Dynamic,Eigen::Dynamic, Eigen::RowMajor> MatrixXfrm;
 
+bool isRunning = false;
+
+int counter = 0;
+
 PlaneEstimator::PlaneEstimator(PointCloudViewer * viewer) {
 	// TODO Auto-generated constructor stub
 	generatePlaneVBOs();
+	collisionMapSize = 100;
+	initCollisionMap();
+
+	kohonen = false;
 
 	this->viewer = viewer;
 }
 
 PlaneEstimator::~PlaneEstimator() {
 	// TODO Auto-generated destructor stub
+}
+
+void PlaneEstimator::flipPlane() {
+	planeMatrix.col(2) = -1 * planeMatrix.col(2);
+
 }
 
 void PlaneEstimator::generatePlaneVBOs(){
@@ -65,6 +80,11 @@ void PlaneEstimator::draw() {
 		glGenBuffers(1, &inlierBufferId);
 		glBindBuffer(GL_ARRAY_BUFFER, inlierBufferId);         // for vertex coordinates
 		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * inliers.size(), inliers.data(), GL_STATIC_DRAW);
+
+		unsigned int collisionNetBufferID = 0;
+		glGenBuffers(1, &collisionNetBufferID);
+		glBindBuffer(GL_ARRAY_BUFFER, collisionNetBufferID);         // for vertex coordinates
+		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * collisionInliers.size(), collisionInliers.data(), GL_STATIC_DRAW);
 
 
 		glMatrixMode(GL_MODELVIEW);
@@ -118,9 +138,35 @@ void PlaneEstimator::draw() {
 				glColor3f(1, 1, 1);
 		}
 
+		if(drawCollisionMap){
+			glEnableClientState(GL_VERTEX_ARRAY);
+
+				glPointSize(2);
+				glBindBuffer(GL_ARRAY_BUFFER, collisionNetBufferID);
+				glVertexPointer(3, GL_FLOAT, sizeof(Eigen::Vector3f), 0);
+				glColor3f(1, 0, 0);
+				glDrawArrays(GL_POINTS, 0, collisionInliers.size());
+
+				glDisableClientState(GL_VERTEX_ARRAY);
+
+				glColor3f(1, 1, 1);
+		}
 
 		glDeleteBuffers(1, &planeBufferId);
 		glDeleteBuffers(1, &inlierBufferId);
+		glDeleteBuffers(1, &collisionNetBufferID);
+
+//		selfOrganizingMap(viewer->getGraphDisplay()->getKeyframes());
+//
+//		if(counter % 1000 == 0){
+//			cooperationRadius-=1;
+//			counter = 0;
+//			eta/=10;
+//		}
+//
+//		counter++;
+//
+//		drawKohonenNet();
 
 	}
 }
@@ -256,72 +302,108 @@ std::vector<Eigen::Vector3f> PlaneEstimator::ransac(const std::vector<KeyFrameDi
 }
 
 void PlaneEstimator::selfOrganizingMap(const std::vector<KeyFrameDisplay*> &keyframeDisplays){
-	int absolutePointNumber = 0;
 
-	std::vector<Eigen::Vector3f> inliers;
+	if(!kohonen){
+		kohonen = true;
 
-	for(unsigned int i=0;i<keyframeDisplays.size();i++)
-	{
-		absolutePointNumber+=keyframeDisplays[i]->getKeyframePointcloud()->size();
-	}
+		kohonenCount = 1000000;
 
-	std::vector<Eigen::Vector3f> globalPointCloud;
-	globalPointCloud.reserve(absolutePointNumber);
+		kohonenAbsPointNo = 0;
 
-	for(unsigned int i =0; i<keyframeDisplays.size(); i++)
-	{
-		globalPointCloud.insert(globalPointCloud.end(), keyframeDisplays[i]->getKeyframePointcloud()->begin(), keyframeDisplays[i]->getKeyframePointcloud()->end());
-	}
-
-	std::vector< std::vector<Eigen::Vector3f> > kohonenNet;
-	kohonenNet.reserve(2000);
-
-	for(int i = 0; i<2000; i++){
-
-	}
-
-	int trainIndex = 0;
-	int cooperationRadius = kohonenNet.size()/10;
-	Eigen::Vector2f winnerIndices (0,0);
-	float distance = 0;
-
-	for(int i = 0; i<10000; i++){
-		//Choose point from pointcloud at random.
-		trainIndex = rand()%(absolutePointNumber);
-
-		//Get the index of the closest neuron.
-		winnerIndices = getClosestIndex(kohonenNet, globalPointCloud[trainIndex]);
-
-		for(int i = 0; i<cooperationRadius; i++){
-			for(int j = 0; j<cooperationRadius; j++){
-
-
-			}
+		for(unsigned int i=0;i<keyframeDisplays.size();i++)
+		{
+			kohonenAbsPointNo+=keyframeDisplays[i]->getKeyframePointcloud()->size();
 		}
+
+		kohonenPointCloud.reserve(kohonenAbsPointNo);
+
+		for(unsigned int i =0; i<keyframeDisplays.size(); i++)
+		{
+			kohonenPointCloud.insert(kohonenPointCloud.end(), keyframeDisplays[i]->getKeyframePointcloud()->begin(), keyframeDisplays[i]->getKeyframePointcloud()->end());
+		}
+
+		kohonenSize = (int) sqrt(kohonenAbsPointNo*1.2);
+		kohonenNet.reserve(kohonenSize* kohonenSize);
+
+
+		//Initialize the Kohonen Net with random points of the pointcloud
+		for(int i = 0; i<kohonenSize*kohonenSize; i++){
+			kohonenNet.push_back(kohonenPointCloud[rand()%kohonenAbsPointNo]);
+		}
+		cooperationRadius = kohonenSize;
+
+		winnerIndex = 0;
+
+		eta = 0.1;
+
+		counter = 0;
 	}
 
+	//Choose point from pointcloud at random.
+	trainIndex = rand()%(kohonenAbsPointNo);
+
+	//Get the index of the closest neuron.
+	winnerIndex = getClosestIndices(kohonenNet, kohonenPointCloud[trainIndex]);
+
+	std::cout<<"Winner Index: "<< winnerIndex<<std::endl;
+	std::cout<<"KohoneNetSize: "<<kohonenSize<<std::endl;
+	std::cout<<"Point Cloud size: "<<kohonenPointCloud.size()<<std::endl;
+	std::cout<<"Cooperation Radius: "<<cooperationRadius<<std::endl;
+
+	for(int i = -cooperationRadius/2; i<cooperationRadius/2; i++){
+		for(int j = -cooperationRadius/2; j<cooperationRadius/2; j++){
+			int neighborIndex = winnerIndex + i * kohonenSize + j ;
+
+			if(neighborIndex<0) continue;
+			if(neighborIndex>kohonenNet.size()) break;
+
+			kohonenNet[neighborIndex] +=
+					eta * (kohonenPointCloud[trainIndex]-kohonenNet[neighborIndex]);
+		}
+
+	}
+}
+
+void PlaneEstimator::drawKohonenNet(){
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+
+	unsigned int kohonenNetID = 0;
+	glGenBuffers(1, &kohonenNetID);
+	glBindBuffer(GL_ARRAY_BUFFER, kohonenNetID);         // for vertex coordinates
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * kohonenSize*kohonenSize, kohonenNet.data(), GL_STATIC_DRAW);
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+
+	glPointSize(1);
+	glBindBuffer(GL_ARRAY_BUFFER, kohonenNetID);
+	glVertexPointer(3, GL_FLOAT, sizeof(Eigen::Vector3f), 0);
+	glColor3f(1, 0, 0);
+	glDrawArrays(GL_POINTS, 0, kohonenSize*kohonenSize);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+
+	glColor3f(1, 1, 1);
+
+	glDeleteBuffers(1, &kohonenNetID);
 
 }
 
-Eigen::Vector2f PlaneEstimator::getClosestIndex(const std::vector< std::vector <Eigen::Vector3f> > pointCloud, Eigen::Vector3f point){
+int PlaneEstimator::getClosestIndices(std::vector<Eigen::Vector3f> kohonenNet, Eigen::Vector3f point){
 	float minDistance = 10000;
-	Eigen::Vector2f minCoordinates (0,0);
+	int minCoordinate = 0;
 	float distance = 0;
 
-	for(unsigned int i = 0; i<pointCloud.size(); i++){
-		for(unsigned int j = 0; j<pointCloud[i].size(); j++){
-			distance = (point-pointCloud[i][j]).norm();
+	for(unsigned int i = 0; i<kohonenNet.size(); i++){
+		distance = (point-kohonenNet[i]).norm();
 
-			if(distance<minDistance){
-				minCoordinates(0) = i;
-				minCoordinates(1) = j;
+		if(distance<minDistance){
+			minCoordinate = i;
 
-				minDistance = distance;
-			}
+			minDistance = distance;
 		}
 	}
 
-	return minCoordinates;
+	return minCoordinate;
 }
 
 void PlaneEstimator::calcHessianParameters(Eigen::Vector3f P1, Eigen::Vector3f P2, Eigen::Vector3f P3, Eigen::Vector3f &normal, float &planeOriginDis){
@@ -376,7 +458,9 @@ void PlaneEstimator::refreshPlane(){
 	keyframeCovMatrix = (centered.adjoint() * centered) / float(mat.rows());
 
 	//Weighted average of "old" covariance Matrix and new one
-	covarianceMatrix = (covarianceMatrix*totalInlierNumber + keyframeCovMatrix*keyframeInlierNo) / float(keyframeInlierNo+totalInlierNumber);
+//	covarianceMatrix = (covarianceMatrix*totalInlierNumber + keyframeCovMatrix*keyframeInlierNo) / float(keyframeInlierNo+totalInlierNumber);
+	covarianceMatrix = (covarianceMatrix + keyframeCovMatrix);
+
 	totalInlierNumber += keyframeInlierNo;
 
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(covarianceMatrix);
@@ -425,7 +509,67 @@ Eigen::Vector4f PlaneEstimator::calcPlaneParams(Eigen::Vector3f P1, Eigen::Vecto
 	return buffer1;
 }
 
+void PlaneEstimator::initCollisionMap(){
+	collisionMap = std::vector<std::vector<int> > (collisionMapSize);
+
+	for(int i = 0; i<collisionMapSize; i++){
+		collisionMap[i] = std::vector<int> (collisionMapSize, 0);
+	}
+}
+
 void PlaneEstimator::createCollisionMap(){
+	std::vector<KeyFrameDisplay *> keyframes = viewer->getGraphDisplay()->getKeyframes();
 
+	Eigen::Vector3f planeSupportPoint = planeMatrix.col(3).topRows(3);
+	Eigen::Vector3f planeNormal = planeMatrix.col(2).topRows(3).normalized();
+	float planeOriginDis = planeNormal.dot(planeSupportPoint);
+	float distance = 0;
 
+	for(unsigned int i =0; i<keyframes.size(); i++)
+	{
+		std::vector<Eigen::Vector3f> * pointcloud =keyframes[i]->getKeyframePointcloud();
+
+		for(unsigned int j = 0; j<pointcloud->size(); j++){
+			distance = planeNormal.dot((*pointcloud)[j]) - planeOriginDis;
+
+			if(distance > 5* ransacTolerance & distance< 20*ransacTolerance ){
+				Eigen::Vector3f projectedPoint = (*pointcloud)[j] - distance*planeNormal;
+				Eigen::Vector4f homogenousPoint = Eigen::Vector4f::Zero();
+				homogenousPoint.topRows(3) = projectedPoint;
+				homogenousPoint(3) = 1;
+				Eigen::Vector4f projectedPoint_planeCos = planeMatrix.inverse() * homogenousPoint;
+
+				if(projectedPoint_planeCos(0)<2.5 & projectedPoint_planeCos(0)>-2.5 & projectedPoint_planeCos(1)>-2.5 & projectedPoint_planeCos(1)<2.5){
+					collisionInliers.push_back((*pointcloud)[j]);
+
+					collisionMap[(collisionMapSize/5)*(projectedPoint_planeCos(0) + 2.5)][(collisionMapSize/5)*(projectedPoint_planeCos(1)+2.5)] += 1;
+				}
+			}
+		}
+	}
+
+	for(unsigned int i = 0; i<collisionMapSize; i++){
+		for(unsigned int j = 0; j<collisionMapSize; j++){
+			std::cout<<collisionMap[i][j]<< " ";
+		}
+
+		std::cout<<std::endl;
+	}
+
+	drawCollisionMap = true;
+
+}
+
+bool PlaneEstimator::checkCollision(Eigen::Vector4f position){
+	Eigen::Vector4f planeSupportPoint = planeMatrix.col(3);
+	Eigen::Vector4f planeNormal = planeMatrix.col(2).normalized();
+
+	Eigen::Vector4f projectedPoint = position - position.dot(planeNormal)*planeNormal;
+	Eigen::Vector4f projectedPoint_planeCos = planeMatrix.inverse() * projectedPoint;
+
+	if(projectedPoint_planeCos(0)<2.5 & projectedPoint_planeCos(0)>-2.5 & projectedPoint_planeCos(1)>-2.5 & projectedPoint_planeCos(1)<2.5){
+		if(collisionMap[(collisionMapSize/5)*(projectedPoint_planeCos(0) + 2.5)][(collisionMapSize/5)*(projectedPoint_planeCos(1) + 2.5)] > 10) return true;
+	}
+
+	return false;
 }

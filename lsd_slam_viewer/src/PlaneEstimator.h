@@ -23,6 +23,8 @@ public:
 	PlaneEstimator(PointCloudViewer  * viewer);
 	virtual ~PlaneEstimator();
 
+	void flipPlane();
+
 	void draw();
 
 	void addMsg(lsd_slam_viewer::keyframeMsgConstPtr msg);
@@ -30,7 +32,11 @@ public:
 
 	void beginPlaneTracking();
 	Eigen::Matrix4f getPlaneParameters();
+
+	/*** Collision Map ****/
+	bool checkCollision(Eigen::Vector4f position);
 	void createCollisionMap();
+
 
 private:
 	/**** Functions ****/
@@ -46,6 +52,8 @@ private:
 	Eigen::Matrix3f covarianceMatrix;
 
 	bool planeTracking;
+	bool kohonen;
+	bool drawCollisionMap;
 
 	unsigned int totalInlierNumber;
 	unsigned int keyframeUpdateTracker;
@@ -64,6 +72,27 @@ private:
 	Eigen::Matrix <float, 4, 4, Eigen::ColMajor> planeMatrix;
 
 
+	/**** Kohonen Net ****/
+	std::vector<Eigen::Vector3f> kohonenInlier;
+	std::vector<Eigen::Vector3f> kohonenPointCloud;
+	std::vector<Eigen::Vector3f> kohonenNet;
+	unsigned int kohonenCount;
+	unsigned int kohonenAbsPointNo;
+
+	int trainIndex;
+	int cooperationRadius;
+	int winnerIndex;
+	float eta;
+	int counter ;
+	int kohonenSize;
+
+	/*** Collision Map ****/
+	void initCollisionMap();
+
+	std::vector<Eigen::Vector3f> collisionInliers;
+	int collisionMapSize;
+	std::vector< std::vector<int> > collisionMap;
+
 
 private:
 	std::vector<Eigen::Vector3f> ransac(const std::vector<KeyFrameDisplay*> &keyframeDisplays, const int iterations, const float inlierDistance);
@@ -71,7 +100,8 @@ private:
 	void calcHessianParameters(Eigen::Vector3f P1, Eigen::Vector3f P2, Eigen::Vector3f P3, Eigen::Vector3f &normal, float &planeOriginDis);
 	double calcPlanePointDis(Eigen::Vector3f planeNormal, float planeOriginDis, Eigen::Vector3f P);
 	void selfOrganizingMap(const std::vector<KeyFrameDisplay*> &keyframeDisplays);
-	Eigen::Vector2f getClosestIndex(const std::vector< std::vector <Eigen::Vector3f> > pointCloud, Eigen::Vector3f point);
+	int getClosestIndices(std::vector<Eigen::Vector3f> kohonenNet, Eigen::Vector3f point);
+	void drawKohonenNet();
 
 	template <typename Derived> static Eigen::Matrix3f pcaPlaneFitting(Eigen::MatrixBase<Derived> &mat, Eigen::Vector3f &tangent, Eigen::Vector3f &bitangent, Eigen::Vector3f &center){
 		center = mat.colwise().mean().transpose();

@@ -168,7 +168,7 @@ ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * viewer)
 
     image = 0;
     width_img = height_img = 0;
-
+    ego = false;
 
     show();
 
@@ -178,7 +178,7 @@ ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * viewer)
     this->name = name;
     this->viewer = viewer;
     this->planeEstimator = new PlaneEstimator(viewer);
-    this->arObject = new ARObject();
+    this->arObject = new ARObject(planeEstimator);
 
     QTimer *timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(update()));
@@ -227,9 +227,8 @@ void ARViewer::paintGL()
     makeCurrent();
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
-	if(image != 0)
+	if(image != 0 && !ego)
 	{
-
 		glMatrixMode(GL_MODELVIEW);
 
 		glPushMatrix();
@@ -252,7 +251,11 @@ void ARViewer::paintGL()
 		glMatrixMode(GL_MODELVIEW);
 		glPushMatrix();
 
-			glLoadMatrixf(viewer->getModelViewMatrix().data());
+			if(ego) {
+				Eigen::Matrix4f inverseObjectPose = arObject->getPose()->inverse();
+				glLoadMatrixf((float*)(inverseObjectPose.data()));
+			}
+			else glLoadMatrixf(viewer->getModelViewMatrix().data());
 			glMatrixMode(GL_PROJECTION);
 			glPushMatrix();
 
@@ -355,6 +358,13 @@ void ARViewer::keyPressEvent(QKeyEvent *ke)
 			break;
 		case Qt::Key_F:
 			arObject->flipNormal();
+			planeEstimator->flipPlane();
+			break;
+		case Qt::Key_E:
+			ego = !ego;
+			break;
+		case Qt::Key_C:
+			planeEstimator->createCollisionMap();
 			break;
 	}
 
