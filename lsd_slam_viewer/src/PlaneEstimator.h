@@ -13,10 +13,12 @@
 #include "KeyFrameDisplay.h"
 #include "KeyFrameGraphDisplay.h"
 #include "PointCloudViewer.h"
+#include "Octree.h"
 
 class PointCloudViewer;
 class KeyFrameGraphDisplay;
 class KeyFrameDisplay;
+class Octree;
 
 class PlaneEstimator {
 public:
@@ -36,6 +38,9 @@ public:
 	/*** Collision Map ****/
 	bool checkCollision(Eigen::Vector4f position);
 	void createCollisionMap();
+
+	/*** Octree ***/
+	Octree * octree;
 
 
 private:
@@ -105,6 +110,12 @@ private:
 	void selfOrganizingMap(const std::vector<KeyFrameDisplay*> &keyframeDisplays);
 	int getClosestIndices(std::vector<Eigen::Vector3f> kohonenNet, Eigen::Vector3f point);
 	void drawKohonenNet();
+
+
+	/*** Octree ***/
+	void buildOctree(const std::vector<Eigen::Vector3f> * pointcloud);
+	int findMinimumPointIndex(const std::vector<Eigen::Vector3f> * pointcloud);
+	int findMaximumPointIndex(const std::vector<Eigen::Vector3f> * pointcloud);
 
 	template <typename Derived> static Eigen::Matrix3f pcaPlaneFitting(Eigen::MatrixBase<Derived> &mat, Eigen::Vector3f &tangent, Eigen::Vector3f &bitangent, Eigen::Vector3f &center){
 		center = mat.colwise().mean().transpose();

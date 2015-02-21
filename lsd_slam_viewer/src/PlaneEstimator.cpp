@@ -17,6 +17,7 @@
 #include <ctime>
 
 #include "settings.h"
+#include "Octree.h"
 
 typedef Eigen::Matrix<float,Eigen::Dynamic,Eigen::Dynamic, Eigen::RowMajor> MatrixXfrm;
 
@@ -172,9 +173,17 @@ void PlaneEstimator::draw() {
 }
 
 void PlaneEstimator::beginPlaneTracking(){
-	if(viewer->getGraphDisplay()->getKeyframes().empty()) return;
+	std::vector< KeyFrameDisplay *> keyframes = viewer->getGraphDisplay()->getKeyframes();
 
-	inliers = ransac(viewer->getGraphDisplay()->getKeyframes(), 300, ransacTolerance);
+	if(keyframes.empty()) return;
+	std::vector<Eigen::Vector3f> globalPointCloud;
+
+	for(unsigned int i =0; i<keyframes.size(); i++)
+	{
+		globalPointCloud.insert(globalPointCloud.end(), keyframes[i]->getKeyframePointcloud()->begin(), keyframes[i]->getKeyframePointcloud()->end());
+	}
+
+	inliers = qdegsac(globalPointCloud, 300, ransacTolerance);
 
 	MatrixXfrm mat ((int)inliers.size(), 3);
 	mat = Eigen::Map<MatrixXfrm> ((float*)inliers.data(), (int)inliers.size(), 3);
@@ -344,15 +353,21 @@ std::vector<Eigen::Vector3f> PlaneEstimator::qdegsac(const std::vector<Eigen::Ve
 				inliers.push_back(P);
 			}
 
-			j+=1;
+			j+=10;
 		}
 
-		if (inliers.size() > maxInliers & ((float)inliers.size()/(float)twoDimRansac(inliers, iterations, inlierTolerance))>2) {
+		int twodimransacInliernum = twoDimRansac(inliers, iterations, inlierTolerance);
+
+
+		if (inliers.size() > maxInliers & ((float)inliers.size()/(float)twodimransacInliernum)>2) {
+
 			maxInliers = inliers.size();
 			bestPoints[0] = pos1;
 			bestPoints[1] = pos2;
 			bestPoints[2] = pos3;
 		}
+
+		inliers.clear();
 	}
 
 	P1 = pointcloud[bestPoints[0]];
@@ -380,7 +395,7 @@ int PlaneEstimator::twoDimRansac(std::vector<Eigen::Vector3f> pointcloud, int it
 	Eigen::Vector3f P1, P2, P;
 	double dis;
 
-	for (int i=0; i < iterations; i++)
+	for (int i=0; i < iterations*2; i++)
 	{
 		// get Random Points
 		pos1 = rand() % pointcloud.size();
@@ -696,3 +711,49 @@ bool PlaneEstimator::checkCollision(Eigen::Vector4f position){
 
 	return false;
 }
+
+void PlaneEstimator::buildOctree(const std::vector<Eigen::Vector3f> * pointcloud){
+	int maxIndex = findMaximumPointIndex(pointcloud);
+	int minIndex = findMinimumPointIndex(pointcloud);
+
+	Eigen::Vector3f connectionVector = (*pointcloud)[maxIndex] - (*pointcloud)[minIndex];
+	Eigen::Vector3f middle = (*pointcloud)[minIndex] + connectionVector/2;
+
+	octree = new Octree((*pointcloud)[minIndex], middle);
+
+	OctreePoint * octreePoints = new OctreePoint[pointcloud->size()];
+	for(int i=0; i<pointcloud->size(); ++i) {
+		octreePoints[i].setPosition((*pointcloud)[i]);
+		octree->insert(octreePoints + i);
+	}
+}
+
+int PlaneEstimator::findMinimumPointIndex(const std::vector<Eigen::Vector3f> * pointcloud){
+	int minIndex = 0;
+	float minNorm = (*pointcloud)[0].norm();
+
+	for (int i =0; i<pointcloud->size(); i++) {
+		float norm = (*pointcloud)[i].norm();
+
+		if(norm < minNorm){
+			minIndex = i;
+			minNorm = norm;
+		}
+	}
+}
+
+int PlaneEstimator::findMaximumPointIndex(const std::vector<Eigen::Vector3f> * pointcloud){
+	int maxIndex = 0;
+	float maxNorm = (*pointcloud)[0].norm();
+
+	for (int i =0; i<pointcloud->size(); i++) {
+		float norm = (*pointcloud)[i].norm();
+
+		if(norm < maxNorm){
+			maxIndex = i;
+			maxNorm = norm;
+		}
+	}
+}
+
+

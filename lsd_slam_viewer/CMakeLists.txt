@@ -62,6 +62,7 @@ set(HEADER_FILES
   src/ARViewer.h
   src/ARObject.h
   src/PlaneEstimator.h
+  src/Octree.h
 )
 
 include_directories(
