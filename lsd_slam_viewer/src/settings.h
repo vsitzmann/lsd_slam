@@ -42,5 +42,21 @@ extern int numRefreshedAlready;
 
 extern double lastFrameTime;
 
+extern unsigned int ransacIterations;
+extern float inlierThreshold;
+extern float octreeLeafSidelengthFactor;
+extern bool useOcransac;
+extern bool followCamera;
+
+extern bool drawCollisionMap;
 extern bool drawInlier;
-extern float ransacTolerance;
+extern bool drawPlane;
+extern bool drawARObject;
+extern bool drawOctree;
+extern bool drawOctreeCell;
+extern bool drawARPointcloud;
+extern bool egoPerspective;
+
+extern bool collisionChecking;
+extern bool drawCollisionPoints;
+

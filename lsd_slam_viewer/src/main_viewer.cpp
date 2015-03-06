@@ -66,8 +66,26 @@ void dynConfCb(lsd_slam_viewer::LSDSLAMViewerParamsConfig &config, uint32_t leve
 	cutFirstNKf = config.cutFirstNKf;
 
 	saveAllVideo = config.saveAllVideo;
-	ransacTolerance = config.ransacTolerance;
+
+	drawARPointcloud = config.drawARPointcloud;
 	drawInlier = config.drawInlier;
+	drawARObject = config.drawARObject;
+	drawOctree = config.drawOctree;
+	drawPlane = config.drawPlane;
+	drawOctreeCell = config.drawOctreeCell;
+	drawARPointcloud = config.drawARPointcloud;
+
+	ransacIterations = config.ransacIterations;
+	inlierThreshold = config.inlierThreshold;
+	octreeLeafSidelengthFactor = config.octreeLeafSidelengthFactor;
+
+	followCamera = config.followCamera;
+	useOcransac = config.useOcransac;
+	egoPerspective = config.egoPerspective;
+
+	collisionChecking = config.collisionChecking;
+	drawCollisionMap = config.drawCollisionMap;
+
 
 }
 
@@ -76,7 +94,7 @@ void frameCb(lsd_slam_viewer::keyframeMsgConstPtr msg)
 
 	if(msg->time > lastFrameTime) return;
 
-//	popImage(msg->id);
+	popImage((unsigned int)msg->id);
 
 	if(viewer != 0)
 		viewer->addFrameMsg(msg);
@@ -89,11 +107,11 @@ void graphCb(lsd_slam_viewer::keyframeGraphMsgConstPtr msg)
 
 void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-//	enqueueImage(msg);
+	enqueueImage(msg);
 
-	cv::Mat image =  cv_bridge::toCvShare(msg, "rgb8")->image;
-
-	displayImage("AR Demo", image, false);
+//	cv::Mat image =  cv_bridge::toCvShare(msg, "rgb8")->image;
+//
+//	displayImage("AR Demo", image, false);
 }
 
 
@@ -171,6 +189,7 @@ void rosFileLoop( int argc, char** argv )
 
 int main( int argc, char** argv )
 {
+	srand(time(0));
 
 	printf("Started QApplication thread\n");
 	// Read command lines arguments.

@@ -16,11 +16,13 @@
 #include "PlaneEstimator.h"
 #include "PointCloudViewer.h"
 #include "ARObject.h"
+#include "Benchmarking.h"
 
 class KeyFrameGraphDisplay;
 class PlaneEstimator;
 class PointCloudViewer;
 class ARObject;
+class Benchmarking;
 
 struct DisplayImageObect
 {
@@ -42,16 +44,19 @@ protected:
 public:
     void loadImage(cv::Mat m, bool resize=false);
     void setPointCloudViewerPointer(PointCloudViewer * viewer);
+    void reset();
 
     std::string name;
+    PointCloudViewer * viewer;
+
 private:
 
     void showTitlePage();
     void initARDemo();
 private:
-    PointCloudViewer * viewer;
     PlaneEstimator * planeEstimator;
     ARObject * arObject;
+    Benchmarking * benchmarking;
 
     bool arDemo;
 	bool ego;
@@ -61,7 +66,7 @@ private:
 
 void displayImage(const char* windowName, const cv::Mat& image, bool autoSize = true);
 void enqueueImage(const sensor_msgs::ImageConstPtr& msg);
-void popImage(int imageId);
+void popImage(unsigned int imageId);
 int waitKey(int milliseconds);
 void closeAllWindows();
 

@@ -40,7 +40,7 @@ rosbuild_genmsg()
 # SSE flags
 rosbuild_check_for_sse()
 set(CMAKE_CXX_FLAGS
-   "${SSE_FLAGS} -std=c++0x"
+   "${SSE_FLAGS} -std=c++11"
 )
 
 # SSE Sources files
@@ -52,6 +52,8 @@ set(SOURCE_FILES
   src/ARViewer.cpp
   src/ARObject.cpp
   src/PlaneEstimator.cpp
+  src/Benchmarking.cpp
+  src/PlaneFittingTools.cpp
 )
 
 set(HEADER_FILES     
@@ -63,6 +65,8 @@ set(HEADER_FILES
   src/ARObject.h
   src/PlaneEstimator.h
   src/Octree.h
+  src/Benchmarking.h
+  src/PlaneFittingTools.h
 )
 
 include_directories(

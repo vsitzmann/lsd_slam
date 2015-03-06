@@ -27,33 +27,39 @@
 
 using namespace std;
 
-int accelerationDirection = 0;
-
-double maxVelocity = 0.025;
-double acceleration = 0.05;
-double velocity = 0;
-
 std::clock_t lastDrawTime = 0;
 
 ARObject::ARObject(PlaneEstimator * planeEstimator) {
-	load_obj("/home/vincent/rosbuild_ws/package_dir/lsd_slam/lsd_slam_viewer/resources/teacup_2.obj");
+	load_obj("/home/vincent/suzanne.obj");
 
 	this->planeEstimator = planeEstimator;
 
 	rotAngle = M_PI/20;
-	speed = 0.1;
+
+	velocity = 0;
+	maxVelocity = 0;
+	acceleration = 0;
+	accelerationDirection = 0;
+	collisionChecking = false;
 }
 
 ARObject::~ARObject() {
 	// TODO Auto-generated destructor stub
 }
 
-void ARObject::setPose(Eigen::Matrix4f initialPose){
-	this->currentPose = initialPose;
-}
+void ARObject::init(const Eigen::Vector4f & cameraViewDirection){
+	this->currentPose = Eigen::Matrix4f::Identity();
 
-void ARObject::setPlaneEstimator(PlaneEstimator * planeEstimator){
-	this->planeEstimator = planeEstimator;
+	float sceneScale = planeEstimator->getSceneScale();
+	maxVelocity = 0.5 * sceneScale;
+	acceleration = 0.1 * sceneScale;
+	accelerationDirection = 0;
+	velocity = 0;
+
+	//Check whether the plane normal points upwards or downwards by calculating the dot product of the
+	//plane normal and the camera's view direction.
+	if(planeEstimator->getPlaneParameters().col(2).dot(planeEstimator->getPlaneParameters().col(2))>0)
+		currentPose.col(2) = currentPose.col(2)*(-1);
 }
 
 Eigen::Matrix4f * ARObject::getPose(){
@@ -84,6 +90,7 @@ void ARObject::draw(){
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLushort)*elements.size(), &elements[0], GL_STATIC_DRAW);
 
 	glPushMatrix();
+		glMultMatrixf(planeEstimator->getPlaneParameters().data());
 		glMultMatrixf(currentPose.data());
 
 		  glEnableVertexAttribArray(0);
@@ -148,22 +155,8 @@ void ARObject::rotate(int leftRight){
 	currentPose.topLeftCorner(3,3) = rotMatrix * currentPose.topLeftCorner(3,3);
 }
 
-void ARObject::moveStraight(int forwBackw){
-	currentPose.col(3) += forwBackw * currentPose.col(0) * speed;
-}
-
-void ARObject::strafe(int leftRight){
-	currentPose.col(3) += leftRight * currentPose.col(1) * speed;
-}
-
 void ARObject::flipNormal(){
 	currentPose.col(2) = currentPose.col(2) * -1;
-}
-
-void ARObject::setNormal(Eigen::Matrix4f planeParameters){
-	currentPose.col(2) = (currentPose.col(2).dot(planeParameters.col(2))*planeParameters.col(2)).normalized();
-	currentPose.col(0) = (currentPose.col(0) - currentPose.col(0).dot(currentPose.col(2))*currentPose.col(2)).normalized();
-	currentPose.col(1) = (currentPose.col(1) - currentPose.col(1).dot(currentPose.col(2))*currentPose.col(2)).normalized();
 }
 
 void ARObject::load_obj(const char* filename) {
@@ -235,6 +228,16 @@ void ARObject::updatePosition(double deltaT){
 
 	Eigen::Vector4f newPosition = currentPose.col(3)  + currentPose.col(0) * velocity;
 
-	if(!planeEstimator->checkCollision(newPosition)) currentPose.col(3) = newPosition;
+	if(!collisionChecking) currentPose.col(3) = newPosition;
+	else if(!planeEstimator->checkCollision(newPosition)) currentPose.col(3) = newPosition;
 	else(stop());
 }
+
+void ARObject::toggleCollisionChecking(){
+	collisionChecking = !collisionChecking;
+}
+
+int ARObject::getNormalSign(){
+	return currentPose(2,2);
+}
+

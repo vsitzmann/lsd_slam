@@ -64,6 +64,7 @@ PointCloudViewer::PointCloudViewer()
 	planeEstimator = 0;
 
 	drawPlane = false;
+	drawARObject = false;
 
 
 	for(int i=0;i<10;i++)
@@ -173,8 +174,6 @@ void PointCloudViewer::updateProjectionMatrix(float fx, float fy, float cx, floa
 
 	//Calculate camProjectionMatrix following the instructions from
 	//http://www.scratchapixel.com/old/lessons/3d-advanced-lessons/perspective-and-orthographic-projection-matrix/opengl-perspective-projection-matrix/
-	//The matrix is loaded in the draw()-function, since the setFromProjectionMatrix() and loadProjectionMatrix()-Functions
-	//didn't seem to work.
 
 	projection(0, 0) = 2 * fx/width;
 	projection(0, 2) = (width-2*cx)/width;
@@ -220,9 +219,15 @@ void PointCloudViewer::draw()
 		resetRequested = false;
 	}
 
-
+	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 
+	if(followCamera) {
+		glLoadMatrixf(modelView.data());
+		glMatrixMode(GL_PROJECTION);
+		glLoadMatrixf(projection.data());
+		glMatrixMode(GL_MODELVIEW);
+	}
 
 	if(animationPlaybackEnabled)
 	{
@@ -295,6 +300,11 @@ void PointCloudViewer::draw()
 	if(drawARObject)
 		arObject->draw();
 
+	if(followCamera) {
+		glMatrixMode(GL_PROJECTION);
+		glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);
+	}
 
 	glPopMatrix();
 
@@ -362,7 +372,7 @@ void PointCloudViewer::keyPressEvent(QKeyEvent *e)
     	  break;
 
       case Qt::Key_R :
-    	    resetRequested = true;
+//    	    resetRequested = true;
 
     	  break;
 

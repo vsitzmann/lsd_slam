@@ -46,5 +46,21 @@ int numRefreshedAlready = 0;
 // cut-off after this
 double lastFrameTime = 1e15;
 
-bool drawInlier = true;
-float ransacTolerance = 0.025;
+
+unsigned int ransacIterations = 300;
+float inlierThreshold = 0.075;
+float octreeLeafSidelengthFactor = 20;
+bool useOcransac = false;
+
+bool drawCollisionMap = false;
+bool followCamera = false;
+bool drawARPointcloud = false;
+bool drawInlier = false;
+bool drawPlane = false;
+bool drawARObject = true;
+bool drawOctree = false;
+bool drawOctreeCell = false;
+bool egoPerspective = false;
+
+bool collisionChecking = false;
+bool drawCollisionPoints = false;

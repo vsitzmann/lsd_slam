@@ -55,7 +55,6 @@ boost::condition_variable keyPressCondition;
 int lastKey=0;
 
 unsigned int idOffset = 0;
-unsigned int currentFrameID = 0;
 bool firstPop = true;
 PointCloudViewer * _viewer;
 
@@ -117,21 +116,26 @@ void enqueueImage(const sensor_msgs::ImageConstPtr& msg)
 	msgQueue.push(msg);
 }
 
-void popImage(int imageId){
+void popImage(unsigned int imageId){
 
 	if(msgQueue.empty()) return;
 
-	if((currentFrameID>imageId) | firstPop){
+	if((msgQueue.front()->header.seq>imageId+idOffset) || firstPop){
+		std::cout<<"Current ID offset: "<<idOffset<<std::endl;
 		idOffset = msgQueue.front()->header.seq - imageId;
+
+		std::cout<<"Detected reset. Flushing the frame buffer."<<std::endl;
+		std::cout<<"Queue front: "<<msgQueue.front()->header.seq<<std::endl;
+		std::cout<<"popped ID: "<<imageId<<std::endl;
+		std::cout<<"New ID offset: "<<idOffset<<std::endl<<std::endl;
+
 		firstPop = false;
 	}
-
-	currentFrameID = imageId;
 
 	while(msgQueue.front()->header.seq<=imageId+idOffset){
 		cv::Mat image =  cv_bridge::toCvShare(msgQueue.front(), "rgb8")->image;
 
-		displayImage("AR Demo", image, false);
+		displayImage("AR Demo", image, true);
 
 		msgQueue.pop();
 
@@ -169,6 +173,7 @@ ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * viewer)
     image = 0;
     width_img = height_img = 0;
     ego = false;
+    arDemo = false;
 
     show();
 
@@ -179,6 +184,7 @@ ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * viewer)
     this->viewer = viewer;
     this->planeEstimator = new PlaneEstimator(viewer);
     this->arObject = new ARObject(planeEstimator);
+    this->benchmarking = new Benchmarking(this);
 
     QTimer *timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(update()));
@@ -188,8 +194,8 @@ ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * viewer)
 ARViewer::~ARViewer()
 {
     if(image != 0) delete[] image;
-    delete[] arObject;
-    delete[] planeEstimator;
+    delete arObject;
+    delete planeEstimator;
 }
 
 void ARViewer::initializeGL()
@@ -200,7 +206,7 @@ void ARViewer::initializeGL()
    GLfloat mat_diffuse[] = {1,1,1,1};
    GLfloat light_position[] = { 6.0, 10.0, 15.0, 1.0 };
 
-   	glEnable(GL_LIGHTING);                 	//enables lighting
+	glEnable(GL_LIGHTING);                 	//enables lighting
 	glEnable(GL_LIGHT0);                   	//enables a light
 	glLightModeli(GL_LIGHT_MODEL_TWO_SIDE,0);  //sets lighting to one-sided
 
@@ -216,7 +222,6 @@ void ARViewer::initializeGL()
 	glLightfv(GL_LIGHT0,GL_DIFFUSE,mat_diffuse);    //updates the light's diffuse colour
 	glLightfv(GL_LIGHT0,GL_SPECULAR,mat_specular);  //updates the light's specular colour
 	glLightfv(GL_LIGHT0,GL_AMBIENT,mat_ambient);    //updates the light's ambient colour
-
 
 }
 
@@ -247,32 +252,55 @@ void ARViewer::paintGL()
 		glPopMatrix();
 	}
 
-	if(arDemo){
-		glMatrixMode(GL_MODELVIEW);
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+
+		if(ego) {
+
+			Eigen::Matrix4f planeTransformation = planeEstimator->getPlaneParameters();
+			Eigen::Matrix4f objectTransformation = *(arObject->getPose());
+
+			Eigen::Matrix4f bufferMatrix = objectTransformation;
+			objectTransformation.col(1) = objectTransformation.col(2);
+			objectTransformation.col(0) = -bufferMatrix.col(1);
+			objectTransformation.col(2) = bufferMatrix.col(0);
+
+			Eigen::Matrix4f totalTransformation = planeTransformation*objectTransformation;
+
+			totalTransformation = totalTransformation.inverse();
+
+			Eigen::Matrix4f transMatrix = Eigen::Matrix4f::Identity();
+			transMatrix(1, 1) = -1;
+			transMatrix(2, 2) = -1;
+
+			totalTransformation = transMatrix * totalTransformation;
+
+			glLoadMatrixf(totalTransformation.data());
+		} else glLoadMatrixf(viewer->getModelViewMatrix().data());
+
+		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
 
-			if(ego) {
-				Eigen::Matrix4f inverseObjectPose = arObject->getPose()->inverse();
-				glLoadMatrixf((float*)(inverseObjectPose.data()));
-			}
-			else glLoadMatrixf(viewer->getModelViewMatrix().data());
-			glMatrixMode(GL_PROJECTION);
-			glPushMatrix();
+			glLoadMatrixf(viewer->getProjectionMatrix().data());
 
-				glLoadMatrixf(viewer->getProjectionMatrix().data());
-				glMatrixMode(GL_MODELVIEW);
+			glMatrixMode(GL_MODELVIEW);
 
-				glEnable(GL_DEPTH_TEST);
+			glEnable(GL_DEPTH_TEST);
 
+			if(arDemo) {
 				planeEstimator->draw();
-				arObject->setNormal(planeEstimator->getPlaneParameters());
-				arObject->draw();
 
-				glDisable(GL_DEPTH_TEST);
+				glEnable(GL_LIGHTING);
+				if(drawARObject) arObject->draw();
+				glDisable(GL_LIGHTING);
+			}
 
-			glPopMatrix();
+			if(drawARPointcloud) viewer->getGraphDisplay()->draw();
+
+			glDisable(GL_DEPTH_TEST);
+
 		glPopMatrix();
-	}
+	glPopMatrix();
 
 	glFlush();
 
@@ -294,8 +322,8 @@ void ARViewer::loadImage(cv::Mat m, bool resize)
 
     if(resize && (width() != width_img || height() != height_img))
     {
-//    	glViewport(0,0,width_img,height_img);
-//    	this->resize(width_img, height_img);
+    	glViewport(0,0,width_img,height_img);
+    	this->resize(width_img, height_img);
     }
 
     if(m.type() == CV_8UC3)
@@ -331,24 +359,35 @@ void ARViewer::loadImage(cv::Mat m, bool resize)
     return;
 }
 
+void ARViewer::reset(){
+	delete planeEstimator;
+	delete arObject;
+	delete benchmarking;
+
+    this->planeEstimator = new PlaneEstimator(viewer);
+    this->arObject = new ARObject(planeEstimator);
+    this->benchmarking = new Benchmarking(this);
+
+    arDemo = false;
+}
+
 void ARViewer::keyPressEvent(QKeyEvent *ke)
 {
 	switch(ke->key()){
-		case Qt::Key_Q:
-			planeEstimator->beginPlaneTracking();
-			arObject->setPose(planeEstimator->getPlaneParameters());
-			viewer->setPlaneEstimator(planeEstimator);
+		case Qt::Key_R:
+			planeEstimator->beginPlaneTracking((Eigen::Vector4f)(viewer->getModelViewMatrix().col(2)));
+			arObject->init(-(Eigen::Vector4f)(viewer->getModelViewMatrix().col(2)));
+			viewer->setPlaneEstimator(this->planeEstimator);
 			viewer->setARObject(arObject);
 			arDemo = true;
 			break;
 		case Qt::Key_A:
-
 			break;
 		case Qt::Key_Up:
-			arObject->accelerate(1);
+			arObject->accelerate(-1);
 			break;
 		case Qt::Key_Down:
-			arObject->accelerate(-1);
+			arObject->accelerate(1);
 			break;
 		case Qt::Key_Left:
 			arObject->rotate(1);
@@ -357,14 +396,41 @@ void ARViewer::keyPressEvent(QKeyEvent *ke)
 			arObject->rotate(-1);
 			break;
 		case Qt::Key_F:
-			arObject->flipNormal();
-			planeEstimator->flipPlane();
 			break;
 		case Qt::Key_E:
-			ego = !ego;
+			if(arDemo) ego = !ego;
+			break;
+		case Qt::Key_Q:
+			break;
+		case Qt::Key_O:
+			break;
+		case Qt::Key_U:
+			break;
+		case Qt::Key_I:
+			break;
+		case Qt::Key_P:
 			break;
 		case Qt::Key_C:
-			planeEstimator->createCollisionMap();
+			break;
+		case Qt::Key_T:
+			break;
+		case Qt::Key_0:
+			benchmarking->ransacIterationSensitivity();
+			break;
+		case Qt::Key_1:
+			benchmarking->ransacToleranceSensitivity();
+			break;
+		case Qt::Key_2:
+			benchmarking->ocRansacLeafSizeSensitivity();
+			break;
+		case Qt::Key_3:
+			benchmarking->ocRansacIterationSensitivity();
+			break;
+		case Qt::Key_4:
+			benchmarking->ocRansacLeafSizeSensitivitySidelengthBased();
+			break;
+		case Qt::Key_5:
+			benchmarking->ocRansacIterationSensitivitySidelengthBased();
 			break;
 	}
 

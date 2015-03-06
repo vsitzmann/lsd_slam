@@ -9,6 +9,7 @@
 
 #include "PlaneEstimator.h"
 #include "PointCloudViewer.h"
+#include "PlaneFittingTools.h"
 
 #include <GL/glx.h>
 #include <GL/gl.h>
@@ -18,6 +19,10 @@
 
 #include "settings.h"
 #include "Octree.h"
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <cmath>
 
 typedef Eigen::Matrix<float,Eigen::Dynamic,Eigen::Dynamic, Eigen::RowMajor> MatrixXfrm;
 
@@ -29,20 +34,22 @@ PlaneEstimator::PlaneEstimator(PointCloudViewer * viewer) {
 	// TODO Auto-generated constructor stub
 	generatePlaneVBOs();
 	collisionMapSize = 100;
-	initCollisionMap();
 
-	kohonen = false;
+	planeValid = false;
+	planeBuffersValid = false;
+
+	octree = 0;
+	sceneScale = 0;
 
 	this->viewer = viewer;
 }
 
 PlaneEstimator::~PlaneEstimator() {
-	// TODO Auto-generated destructor stub
+	delete octree;
 }
 
 void PlaneEstimator::flipPlane() {
 	planeMatrix.col(2) = -1 * planeMatrix.col(2);
-
 }
 
 void PlaneEstimator::generatePlaneVBOs(){
@@ -70,73 +77,58 @@ void PlaneEstimator::generatePlaneVBOs(){
 void PlaneEstimator::draw() {
 
 	if(planeTracking){
-//		refreshPlane();
+		refreshPlane();
 
 		planeBufferId = 0;
 		glGenBuffers(1, &planeBufferId);
-		glBindBuffer(GL_ARRAY_BUFFER, planeBufferId);         // for vertex coordinates
+		glBindBuffer(GL_ARRAY_BUFFER, planeBufferId);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * plane_vertices.size(), plane_vertices.data(), GL_STATIC_DRAW);
 
 		inlierBufferId = 0;
 		glGenBuffers(1, &inlierBufferId);
-		glBindBuffer(GL_ARRAY_BUFFER, inlierBufferId);         // for vertex coordinates
-		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * inliers.size(), inliers.data(), GL_STATIC_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, inlierBufferId);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * consensusSet.size(), consensusSet.data(), GL_STATIC_DRAW);
 
 		unsigned int collisionNetBufferID = 0;
 		glGenBuffers(1, &collisionNetBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, collisionNetBufferID);         // for vertex coordinates
 		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * collisionInliers.size(), collisionInliers.data(), GL_STATIC_DRAW);
 
+		unsigned int octreeCellID = 0;
+		glGenBuffers(1, &octreeCellID);
+		glBindBuffer(GL_ARRAY_BUFFER, octreeCellID);         // for vertex coordinates
+		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * octreeCell.size(), octreeCell.data(), GL_STATIC_DRAW);
 
-		glMatrixMode(GL_MODELVIEW);
+		if(drawPlane){
+			glMatrixMode(GL_MODELVIEW);
 
-		glPushMatrix();
-			glMultMatrixf(planeMatrix.data());
+			glPushMatrix();
+				glMultMatrixf(planeMatrix.data());
 
-//			  glBindBuffer(GL_ARRAY_BUFFER, planeBufferId);
-//			  glVertexAttribPointer(
-//				0,  // attribute
-//				3,                  // number of elements per vertex, here (x,y,z,w)
-//				GL_FLOAT,           // the type of each element
-//				GL_FALSE,           // take our values as-is
-//				0,                  // no extra data between each position
-//				0                   // offset of first element
-//			  );
-//
-//			  glBindBuffer(GL_ARRAY_BUFFER, inlierBufferId);
-//			  glVertexAttribPointer(
-//				0,  // attribute
-//				3,                  // number of elements per vertex, here (x,y,z,w)
-//				GL_FLOAT,           // the type of each element
-//				GL_FALSE,           // take our values as-is
-//				0,                  // no extra data between each position
-//				0                   // offset of first element
-//			  );
+				glEnableClientState(GL_VERTEX_ARRAY);
 
+				  glBindBuffer(GL_ARRAY_BUFFER, planeBufferId);
+					glVertexPointer(3, GL_FLOAT, sizeof(Eigen::Vector3f), 0);
+					glColor3f(1, 1, 1);
+					glDrawArrays(GL_LINE_STRIP, 0, plane_vertices.size());
 
-			glEnableClientState(GL_VERTEX_ARRAY);
+				  glDisableClientState(GL_VERTEX_ARRAY);
 
-			  glBindBuffer(GL_ARRAY_BUFFER, planeBufferId);
-				glVertexPointer(3, GL_FLOAT, sizeof(Eigen::Vector3f), 0);
-				glColor3f(1, 1, 1);
-				glDrawArrays(GL_LINE_LOOP, 0, plane_vertices.size());
-
-			  glDisableClientState(GL_VERTEX_ARRAY);
-
-		glPopMatrix();
+			glPopMatrix();
+		}
 
 		if(drawInlier){
 			glEnableClientState(GL_VERTEX_ARRAY);
 
-				glPointSize(1);
+				glPointSize(2);
 				glBindBuffer(GL_ARRAY_BUFFER, inlierBufferId);
 				glVertexPointer(3, GL_FLOAT, sizeof(Eigen::Vector3f), 0);
 				glColor3f(0, 0, 1);
-				glDrawArrays(GL_POINTS, 0, inliers.size());
+				glDrawArrays(GL_POINTS, 0, consensusSet.size());
 
-				glDisableClientState(GL_VERTEX_ARRAY);
+			glDisableClientState(GL_VERTEX_ARRAY);
 
-				glColor3f(1, 1, 1);
+			glColor3f(1, 1, 1);
 		}
 
 		if(drawCollisionMap){
@@ -148,483 +140,178 @@ void PlaneEstimator::draw() {
 				glColor3f(1, 0, 0);
 				glDrawArrays(GL_POINTS, 0, collisionInliers.size());
 
-				glDisableClientState(GL_VERTEX_ARRAY);
+			glDisableClientState(GL_VERTEX_ARRAY);
 
-				glColor3f(1, 1, 1);
+			glColor3f(1, 1, 1);
+		}
+
+		if(drawOctreeCell){
+			glEnableClientState(GL_VERTEX_ARRAY);
+
+				glPointSize(2);
+				glBindBuffer(GL_ARRAY_BUFFER, octreeCellID);
+				glVertexPointer(3, GL_FLOAT, sizeof(Eigen::Vector3f), 0);
+				glColor3f(0, 1, 0);
+				glDrawArrays(GL_POINTS, 0, octreeCell.size());
+
+			glDisableClientState(GL_VERTEX_ARRAY);
+
+			glColor3f(1, 1, 1);
+		}
+
+		if(drawOctree && octree!=0){
+			octree->drawOctree();
 		}
 
 		glDeleteBuffers(1, &planeBufferId);
 		glDeleteBuffers(1, &inlierBufferId);
 		glDeleteBuffers(1, &collisionNetBufferID);
-
-//		selfOrganizingMap(viewer->getGraphDisplay()->getKeyframes());
-//
-//		if(counter % 1000 == 0){
-//			cooperationRadius-=1;
-//			counter = 0;
-//			eta/=10;
-//		}
-//
-//		counter++;
-//
-//		drawKohonenNet();
-
+		glDeleteBuffers(1, &octreeCellID);
 	}
 }
 
-void PlaneEstimator::beginPlaneTracking(){
+void PlaneEstimator::beginPlaneTracking(const Eigen::Vector4f & cameraViewDirection){
 	std::vector< KeyFrameDisplay *> keyframes = viewer->getGraphDisplay()->getKeyframes();
+
+	calcSceneScale();
 
 	if(keyframes.empty()) return;
 	std::vector<Eigen::Vector3f> globalPointCloud;
-
 	for(unsigned int i =0; i<keyframes.size(); i++)
 	{
 		globalPointCloud.insert(globalPointCloud.end(), keyframes[i]->getKeyframePointcloud()->begin(), keyframes[i]->getKeyframePointcloud()->end());
 	}
 
-	inliers = qdegsac(globalPointCloud, 300, ransacTolerance);
+	std::cout<<"Total number of points: "<<globalPointCloud.size()<<std::endl;
 
-	MatrixXfrm mat ((int)inliers.size(), 3);
-	mat = Eigen::Map<MatrixXfrm> ((float*)inliers.data(), (int)inliers.size(), 3);
+	std::clock_t timer = clock();
+	consensusSet.clear();
 
-	totalInlierNumber = inliers.size();
+	if(useOcransac)ocRansacConsensusSetID(globalPointCloud);
+	else ransacConsensusSetID(globalPointCloud);
 
-	covarianceMatrix = pcaPlaneFitting(mat, initialTangent, initialBitangent, initialCenter);
+	if(consensusSet.empty()) return;
+	std::cout<<"RANSAC runtime: "<<(clock()-timer)/(float)CLOCKS_PER_SEC<<std::endl;
 
+	std::cout<<"Size of consensus set: "<<consensusSet.size()<<std::endl<<std::endl;
+
+	covarianceMatrix = PlaneFittingTools::pcaPlaneFitting(consensusSet, &initialTangent, &initialBitangent, &initialCenter);
 
 	planeMatrix = Eigen::Matrix4f::Identity();
 	planeMatrix.col(3).topRows(3) = initialCenter;
 
-	Eigen::Vector3f x, y, z;
-
-	x = initialTangent.normalized();
-	y = initialBitangent.normalized();
-	z = -x.cross(y).normalized();
-
 	Eigen::Matrix3f rot;
 
-	rot.col(0) = x;
-	rot.col(1) = y;
-	rot.col(2) = z;
+	rot.col(0) = initialTangent.normalized();
+	rot.col(1) = initialBitangent.normalized();
+	rot.col(2) = initialTangent.cross(initialBitangent).normalized();
 
 	planeMatrix.topLeftCorner(3,3) = rot;
 
+	createCollisionMap(cameraViewDirection);
+
 	planeTracking = true;
+	planeBuffersValid = false;
 }
 
-std::vector<Eigen::Vector3f> PlaneEstimator::ransac(const std::vector<KeyFrameDisplay*> &keyframeDisplays, const int iterations, const float inlierDistance){
-	int absolutePointNumber = 0;
+void PlaneEstimator::ransacConsensusSetID(const std::vector<Eigen::Vector3f> &pointcloud){
+	unsigned int downsampleFactor = pointcloud.size()/10000;
 
-	std::vector<Eigen::Vector3f> inliers;
-
-	printf("Ransac will work on %lu keyframes.\n", keyframeDisplays.size());
-
-	for(unsigned int i=0;i<keyframeDisplays.size();i++)
-	{
-		absolutePointNumber+=keyframeDisplays[i]->getKeyframePointcloud()->size();
-	}
-
-	printf("Ransac will run on a total number of %d points\n", absolutePointNumber);
-
-	std::vector<Eigen::Vector3f> globalPointCloud;
-	globalPointCloud.reserve(absolutePointNumber);
-
-	for(unsigned int i =0; i<keyframeDisplays.size(); i++)
-	{
-		globalPointCloud.insert(globalPointCloud.end(), keyframeDisplays[i]->getKeyframePointcloud()->begin(), keyframeDisplays[i]->getKeyframePointcloud()->end());
-	}
-
-	int maxInliers = 0, inlier = 0;
-	int pos1, pos2, pos3;
-	Eigen::Vector3f P1, P2, P3, P;
-	double dis;
-	double bestPoints[3] = {0};
-	Eigen::Vector3f planeNormal;
-	float planeOriginDis;
-	Eigen::Vector4f planeParams;
-
-	for (int i=0; i < iterations; i++)
-	{
-
-		std::cerr<<__PRETTY_FUNCTION__<<" Ransac iteration "<< i << " out of " << iterations <<std::endl;
-
-		// get Random Points
-		pos1 = rand() % absolutePointNumber;
-		pos2 = rand() % absolutePointNumber;
-		pos3 = rand() % absolutePointNumber;
-
-		// ensure all points are different
-		while (pos1 == pos2 || pos2 == pos3 || pos1 == pos3) {
-			pos1 = rand() % absolutePointNumber;
-			pos2 = rand() % absolutePointNumber;
-			pos3 = rand() % absolutePointNumber;
-		}
-
-		P1 = globalPointCloud[pos1];
-		P2 = globalPointCloud[pos2];
-		P3 = globalPointCloud[pos3];
-
-		calcHessianParameters(P1, P2, P3, planeNormal, planeOriginDis);
-
-		inlier = 0;
-		int j = 0;
-
-		while(j < absolutePointNumber){
-			// calculate distance between point and plane
-			P = globalPointCloud[j];
-			dis = calcPlanePointDis(planeNormal, planeOriginDis, P);
-
-			if (dis < inlierDistance){
-				inlier++;
-			}
-
-			j+=10;
-		}
-
-		if (inlier > maxInliers) {
-			maxInliers = inlier;
-			bestPoints[0] = pos1;
-			bestPoints[1] = pos2;
-			bestPoints[2] = pos3;
-		}
-	}
-
-	P1 = globalPointCloud[bestPoints[0]];
-	P2 = globalPointCloud[bestPoints[1]];
-	P3 = globalPointCloud[bestPoints[2]];
-
-	calcHessianParameters(P1, P2, P3, planeNormal, planeOriginDis);
-
-	for (int j = 0; j < absolutePointNumber; j++) {
-		// calculate distance between point and plane
-		P = globalPointCloud[j];
-		double dis = calcPlanePointDis(planeNormal, planeOriginDis, P);
-
-		if (dis < inlierDistance){
-			inliers.push_back(globalPointCloud[j]);
-		}
-	}
-
-	printf("%u inliers out of a total %u points\n", inliers.size());
-	return inliers;
+	PlaneFittingTools::ransac(pointcloud, &consensusSet, ransacIterations, inlierThreshold*sceneScale, downsampleFactor);
 }
 
-std::vector<Eigen::Vector3f> PlaneEstimator::qdegsac(const std::vector<Eigen::Vector3f> pointcloud, int iterations, float inlierTolerance){
-	std::vector<Eigen::Vector3f> inliers;
+void PlaneEstimator::ocRansacConsensusSetID(const std::vector<Eigen::Vector3f> &pointcloud){
+	unsigned int downsampleFactor = pointcloud.size()/10000;
 
-	unsigned int maxInliers = 0;
-	int pos1, pos2, pos3;
-	Eigen::Vector3f P1, P2, P3, P;
-	double dis;
-	double bestPoints[3] = {0};
-	Eigen::Vector3f planeNormal;
-	float planeOriginDis;
-	Eigen::Vector4f planeParams;
+	delete octree;
+	octree = new Octree( Eigen::Vector3f(0,0,0), PlaneFittingTools::findOutermostPoint(pointcloud), (float)(octreeLeafSidelengthFactor*inlierThreshold*sceneScale));
 
-	for (int i=0; i < iterations; i++)
-	{
-		// get Random Points
-		pos1 = rand() % pointcloud.size();
-		pos2 = rand() % pointcloud.size();
-		pos3 = rand() % pointcloud.size();
-
-		// ensure all points are different
-		while (pos1 == pos2 || pos2 == pos3 || pos1 == pos3) {
-			pos1 = rand() % pointcloud.size();
-			pos2 = rand() % pointcloud.size();
-			pos3 = rand() % pointcloud.size();
-		}
-
-		P1 = pointcloud[pos1];
-		P2 = pointcloud[pos2];
-		P3 = pointcloud[pos3];
-
-		calcHessianParameters(P1, P2, P3, planeNormal, planeOriginDis);
-
-		int j = 0;
-
-		while(j < pointcloud.size()){
-			// calculate distance between point and plane
-			P = pointcloud[j];
-			dis = calcPlanePointDis(planeNormal, planeOriginDis, P);
-
-			if (dis < inlierTolerance){
-				inliers.push_back(P);
-			}
-
-			j+=10;
-		}
-
-		int twodimransacInliernum = twoDimRansac(inliers, iterations, inlierTolerance);
-
-
-		if (inliers.size() > maxInliers & ((float)inliers.size()/(float)twodimransacInliernum)>2) {
-
-			maxInliers = inliers.size();
-			bestPoints[0] = pos1;
-			bestPoints[1] = pos2;
-			bestPoints[2] = pos3;
-		}
-
-		inliers.clear();
+	for ( auto &i : pointcloud ) {
+		octree->insertSidelenghtBased(i);
 	}
 
-	P1 = pointcloud[bestPoints[0]];
-	P2 = pointcloud[bestPoints[1]];
-	P3 = pointcloud[bestPoints[2]];
+	Eigen::Vector3f cellIdentifier;
+	PlaneFittingTools::octreeRansac(pointcloud, *octree, &cellIdentifier, &consensusSet, ransacIterations, inlierThreshold*sceneScale, downsampleFactor);
 
-	calcHessianParameters(P1, P2, P3, planeNormal, planeOriginDis);
-
-	for (int j = 0; j < pointcloud.size(); j++) {
-		// calculate distance between point and plane
-		P = pointcloud[j];
-		double dis = calcPlanePointDis(planeNormal, planeOriginDis, P);
-
-		if (dis < inlierTolerance){
-			inliers.push_back(pointcloud[j]);
-		}
-	}
-
-	return inliers;
+	Octree * winnerCell = octree->getLeafContainingPoint(cellIdentifier);
+	octreeCell = winnerCell->data;
 }
 
-int PlaneEstimator::twoDimRansac(std::vector<Eigen::Vector3f> pointcloud, int iterations, float inlierTolerance){
-	int maxInliers = 0, inlier = 0;
-	int pos1, pos2;
-	Eigen::Vector3f P1, P2, P;
-	double dis;
 
-	for (int i=0; i < iterations*2; i++)
-	{
-		// get Random Points
-		pos1 = rand() % pointcloud.size();
-		pos2 = rand() % pointcloud.size();
-
-		// ensure all points are different
-		while (pos1 == pos2) {
-			pos1 = rand() % pointcloud.size();
-			pos2 = rand() % pointcloud.size();
-		}
-
-		P1 = pointcloud[pos1];
-		P2 = pointcloud[pos2];
-
-		inlier = 0;
-		int j = 0;
-
-		while(j < pointcloud.size()){
-			// calculate distance between point and plane
-			P = pointcloud[j];
-			dis = distanceLinePoint(P1, P2, P);
-
-			if (dis < inlierTolerance){
-				inlier++;
-			}
-
-			j+=1;
-		}
-
-		if (inlier > maxInliers) {
-			maxInliers = inlier;
-		}
-	}
-
-	return maxInliers;
-}
-
-void PlaneEstimator::selfOrganizingMap(const std::vector<KeyFrameDisplay*> &keyframeDisplays){
-
-	if(!kohonen){
-		kohonen = true;
-
-		kohonenCount = 1000000;
-
-		kohonenAbsPointNo = 0;
-
-		for(unsigned int i=0;i<keyframeDisplays.size();i++)
-		{
-			kohonenAbsPointNo+=keyframeDisplays[i]->getKeyframePointcloud()->size();
-		}
-
-		kohonenPointCloud.reserve(kohonenAbsPointNo);
-
-		for(unsigned int i =0; i<keyframeDisplays.size(); i++)
-		{
-			kohonenPointCloud.insert(kohonenPointCloud.end(), keyframeDisplays[i]->getKeyframePointcloud()->begin(), keyframeDisplays[i]->getKeyframePointcloud()->end());
-		}
-
-		kohonenSize = (int) sqrt(kohonenAbsPointNo*1.2);
-		kohonenNet.reserve(kohonenSize* kohonenSize);
-
-
-		//Initialize the Kohonen Net with random points of the pointcloud
-		for(int i = 0; i<kohonenSize*kohonenSize; i++){
-			kohonenNet.push_back(kohonenPointCloud[rand()%kohonenAbsPointNo]);
-		}
-		cooperationRadius = kohonenSize;
-
-		winnerIndex = 0;
-
-		eta = 0.1;
-
-		counter = 0;
-	}
-
-	//Choose point from pointcloud at random.
-	trainIndex = rand()%(kohonenAbsPointNo);
-
-	//Get the index of the closest neuron.
-	winnerIndex = getClosestIndices(kohonenNet, kohonenPointCloud[trainIndex]);
-
-	std::cout<<"Winner Index: "<< winnerIndex<<std::endl;
-	std::cout<<"KohoneNetSize: "<<kohonenSize<<std::endl;
-	std::cout<<"Point Cloud size: "<<kohonenPointCloud.size()<<std::endl;
-	std::cout<<"Cooperation Radius: "<<cooperationRadius<<std::endl;
-
-	for(int i = -cooperationRadius/2; i<cooperationRadius/2; i++){
-		for(int j = -cooperationRadius/2; j<cooperationRadius/2; j++){
-			int neighborIndex = winnerIndex + i * kohonenSize + j ;
-
-			if(neighborIndex<0) continue;
-			if(neighborIndex>kohonenNet.size()) break;
-
-			kohonenNet[neighborIndex] +=
-					eta * (kohonenPointCloud[trainIndex]-kohonenNet[neighborIndex]);
-		}
-
-	}
-}
-
-void PlaneEstimator::drawKohonenNet(){
-	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-
-	unsigned int kohonenNetID = 0;
-	glGenBuffers(1, &kohonenNetID);
-	glBindBuffer(GL_ARRAY_BUFFER, kohonenNetID);         // for vertex coordinates
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * kohonenSize*kohonenSize, kohonenNet.data(), GL_STATIC_DRAW);
-
-	glEnableClientState(GL_VERTEX_ARRAY);
-
-	glPointSize(1);
-	glBindBuffer(GL_ARRAY_BUFFER, kohonenNetID);
-	glVertexPointer(3, GL_FLOAT, sizeof(Eigen::Vector3f), 0);
-	glColor3f(1, 0, 0);
-	glDrawArrays(GL_POINTS, 0, kohonenSize*kohonenSize);
-
-	glDisableClientState(GL_VERTEX_ARRAY);
-
-	glColor3f(1, 1, 1);
-
-	glDeleteBuffers(1, &kohonenNetID);
-
-}
-
-int PlaneEstimator::getClosestIndices(std::vector<Eigen::Vector3f> kohonenNet, Eigen::Vector3f point){
-	float minDistance = 10000;
-	int minCoordinate = 0;
-	float distance = 0;
-
-	for(unsigned int i = 0; i<kohonenNet.size(); i++){
-		distance = (point-kohonenNet[i]).norm();
-
-		if(distance<minDistance){
-			minCoordinate = i;
-
-			minDistance = distance;
-		}
-	}
-
-	return minCoordinate;
-}
-
-void PlaneEstimator::calcHessianParameters(Eigen::Vector3f P1, Eigen::Vector3f P2, Eigen::Vector3f P3, Eigen::Vector3f &normal, float &planeOriginDis){
-	normal = (P2 - P1).cross(P3 - P1).normalized();
-
-	if(normal.dot(P1)<0) normal *= -1;
-
-	planeOriginDis = P1.dot(normal);
-}
-
-float PlaneEstimator::distanceLinePoint(Eigen::Vector3f planePoint1, Eigen::Vector3f planePoint2, Eigen::Vector3f otherPoint){
-	Eigen::Vector3f cross = (otherPoint - planePoint1).cross(otherPoint - planePoint2);
-
-	return cross.norm()/(planePoint2 - planePoint1).norm();
-}
-
+/*** update the plane with the information of the latest frame ***/
 void PlaneEstimator::refreshPlane(){
+	//If there are no keyframes yet, return
 	if(viewer->getGraphDisplay()->getKeyframes().empty()) return;
-//	if(viewer->getGraphDisplay()->getKeyframes().size() == lastUpdateFrame) return;
 
+	//If the number of keyframes didn't change since the last call, return
+	if(lastUpdateFrame == viewer->getGraphDisplay()->getKeyframes().size()) return;
 	lastUpdateFrame = viewer->getGraphDisplay()->getKeyframes().size();
 
-	Eigen::Matrix3f keyframeCovMatrix;
-	Eigen::Vector3f keyframePointcloudMean;
-	KeyFrameDisplay * mostRecentFrame = viewer->getGraphDisplay()->getKeyframes().back();
+	std::cout<<"New keyframe pointcloud added. Refreshing plane."<<std::endl;
 
-	/*** update the plane estimation with the information of the latest frame ***/
+	KeyFrameDisplay * mostRecentFrame = viewer->getGraphDisplay()->getKeyframes().back();
 	std::vector<Eigen::Vector3f> * keyframePointcloud = mostRecentFrame->getKeyframePointcloud();
 
 	//Calculate Hessian Representation of plane
-	Eigen::Vector3f planeSupportPoint = planeMatrix.col(3).topRows(3);
-	Eigen::Vector3f planeNormal = planeMatrix.col(2).topRows(3).normalized();
-	float planeOriginDis = planeNormal.dot(planeSupportPoint);
+	HessianNormalForm plane;
+	plane.normal = planeMatrix.col(2).topRows(3).normalized();
+	plane.originDis = plane.normal.dot(planeMatrix.col(3).topRows(3));
 
 	//Identify inliers in new pointcloud
-	double dis = 0;
-	std::vector<Eigen::Vector3f> inliers;
+	std::vector<Eigen::Vector3f> keyframeInliers;
+	PlaneFittingTools::findInliers((*keyframePointcloud), &keyframeInliers, inlierThreshold, plane);
+	if(keyframeInliers.empty()) return;
 
-	for(unsigned int i = 0; i<keyframePointcloud->size(); i++){
-		dis = calcPlanePointDis(planeNormal, planeOriginDis, (*keyframePointcloud)[i]);
-
-		if(dis < ransacTolerance){
-			inliers.push_back((*keyframePointcloud)[i]);
-		}
-	}
-
-	if(inliers.empty()) return;
+	//Add the new inliers to the inlier vector so that they are drawn, too
+	consensusSet.insert(consensusSet.end(), keyframeInliers.begin(), keyframeInliers.end());
 
 	//Calculate covariance matrix of new inliers
-	int keyframeInlierNo = inliers.size();
+	int keyframeInlierNo = keyframeInliers.size();
 
+	//Map the memory layout of the std::vector to the memory layout of a Eigen::Matrix3f
 	MatrixXfrm mat (keyframeInlierNo, 3);
-	mat = Eigen::Map<MatrixXfrm> ((float*)inliers.data(), keyframeInlierNo, 3);
+	mat = Eigen::Map<MatrixXfrm> ((float*)consensusSet.data(), keyframeInlierNo, 3);
 
-	keyframePointcloudMean = mat.colwise().mean().transpose();
+	//Calculate the new keyframe's covariance matrix
+	Eigen::Vector3f keyframePointcloudMean = mat.colwise().mean().transpose();
+	Eigen::Matrix3f centered = mat.rowwise() - keyframePointcloudMean.transpose();
+	Eigen::Matrix3f keyframeCovMatrix = (centered.adjoint() * centered) / (float)mat.rows();
 
-	Eigen::MatrixXf centered = mat.rowwise() - 	keyframePointcloudMean.transpose();
-	keyframeCovMatrix = (centered.adjoint() * centered) / float(mat.rows());
-
-	//Weighted average of "old" covariance Matrix and new one
-//	covarianceMatrix = (covarianceMatrix*totalInlierNumber + keyframeCovMatrix*keyframeInlierNo) / float(keyframeInlierNo+totalInlierNumber);
+	//Add "old" covariance Matrix and new one
 	covarianceMatrix = (covarianceMatrix + keyframeCovMatrix);
+	Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eig(covarianceMatrix);
 
-	totalInlierNumber += keyframeInlierNo;
+	//The plane normal is the cross product of the two largest principal components,
+	//i.e. the eigenvectors with the largest respective eigenvalues. These are contained in columns 2 and 3 of the
+	//SelfAdjointEigenSolver eigenvectors matrix (see Eigen Documentation)
+	Eigen::Vector3f tangent, bitangent, normal;
+	tangent = eig.eigenvectors().col(2);
+	bitangent = eig.eigenvectors().col(1);
+	normal = tangent.cross(bitangent).normalized();
 
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(covarianceMatrix);
+	//In order to make the plane keep its original orientation, the initial plane x and y axis are projected
+	//onto the new plane.
 	Eigen::Vector3f x, y, z;
-
-	//The plane normal is the cross product of the two principal components.
-	Eigen::Vector3f tangent = eig.eigenvectors().col(2);
-	Eigen::Vector3f bitangent = eig.eigenvectors().col(1);
-	Eigen::Vector3f normal = tangent.cross(bitangent).normalized();
-
-	//In order to make the plane keep its original orientation, the original plane coordinate system is
-	//projected onto the new plane
 	x = initialTangent - (initialTangent.dot(normal)) * normal;
 	y = initialBitangent - (initialBitangent.dot(normal)) * normal;
 
 	x.normalize();
 	y.normalize();
-	z = -x.cross(y).normalized();
+	z = x.cross(y).normalized();
 
+	if(z.dot(planeMatrix.col(2).topRows(3))<0 ) z = z*-1;
+
+	//x, y and z make a orthonormal coordinate system that can be used as a transformation matrix for the
+	//plane vertices.
 	Eigen::Matrix3f rot;
-
 	rot.col(0) = x;
 	rot.col(1) = y;
 	rot.col(2) = z;
 
 	planeMatrix.topLeftCorner(3,3) = rot;
+
+	planeValid = true;
+
 }
 
 // Get/Set functions
@@ -632,128 +319,131 @@ Eigen::Matrix4f PlaneEstimator::getPlaneParameters(){
 	return planeMatrix;
 }
 
-double PlaneEstimator::calcPlanePointDis(Eigen::Vector3f planeNormal, float planeOriginDis, Eigen::Vector3f P){
-	return std::abs(planeNormal.dot(P) - planeOriginDis);
-}
-
-Eigen::Vector4f PlaneEstimator::calcPlaneParams(Eigen::Vector3f P1, Eigen::Vector3f P2, Eigen::Vector3f P3){
-	Eigen::Vector4f buffer1;
-
-	buffer1[0] = P1[1] * (P2[2] - P3[2]) + P2[1] * (P3[2] - P1[2]) + P3[1] * (P1[2] - P2[2]);
-	buffer1[1] = P1[2] * (P2[0] - P3[0]) + P2[2] * (P3[0] - P1[0]) + P3[2] * (P1[0] - P2[0]);
-	buffer1[2] = P1[0] * (P2[1] - P3[1]) + P2[0] * (P3[1] - P1[1]) + P3[0] * (P1[1] - P2[1]);
-	buffer1[3] = -(P1[0] * (P2[1] * P3[2] - P3[1] * P2[2]) + P2[0] * (P3[1] * P1[2] - P1[1] * P3[2]) + P3[0] * (P1[1] * P2[2] - P2[1] * P1[2]));
-
-	return buffer1;
-}
-
 void PlaneEstimator::initCollisionMap(){
 	collisionMap = std::vector<std::vector<int> > (collisionMapSize);
 
-	for(int i = 0; i<collisionMapSize; i++){
+	for(unsigned int i = 0; i<collisionMapSize; i++){
 		collisionMap[i] = std::vector<int> (collisionMapSize, 0);
 	}
 }
 
-void PlaneEstimator::createCollisionMap(){
+void PlaneEstimator::createCollisionMap(const Eigen::Vector4f & cameraViewDirection){
 	std::vector<KeyFrameDisplay *> keyframes = viewer->getGraphDisplay()->getKeyframes();
 
+	initCollisionMap();
+	collisionInliers.clear();
+
 	Eigen::Vector3f planeSupportPoint = planeMatrix.col(3).topRows(3);
-	Eigen::Vector3f planeNormal = planeMatrix.col(2).topRows(3).normalized();
-	float planeOriginDis = planeNormal.dot(planeSupportPoint);
-	float distance = 0;
+
+	HessianNormalForm plane;
+	plane.normal = planeMatrix.col(2).topRows(3).normalized();
+	plane.originDis = plane.normal.dot(planeSupportPoint);
+
+	unsigned int maxCount = 0;
+
+	float normalSign;
+	if(cameraViewDirection.topRows(3).dot(plane.normal)>0) normalSign = 1;
+	else normalSign = -1;
 
 	for(unsigned int i =0; i<keyframes.size(); i++)
 	{
 		std::vector<Eigen::Vector3f> * pointcloud =keyframes[i]->getKeyframePointcloud();
 
 		for(unsigned int j = 0; j<pointcloud->size(); j++){
-			distance = planeNormal.dot((*pointcloud)[j]) - planeOriginDis;
+			Eigen::Vector3f currentPoint = (*pointcloud)[j];
 
-			if(distance > 5* ransacTolerance & distance< 20*ransacTolerance ){
-				Eigen::Vector3f projectedPoint = (*pointcloud)[j] - distance*planeNormal;
+			float distance = PlaneFittingTools::calcSignedPlanePointDis(plane, currentPoint) * normalSign;
+
+			if( (distance > 1* inlierThreshold*sceneScale) && (distance< 7*inlierThreshold*sceneScale) ){
+				Eigen::Vector3f projectedPoint = currentPoint - distance*plane.normal;
 				Eigen::Vector4f homogenousPoint = Eigen::Vector4f::Zero();
 				homogenousPoint.topRows(3) = projectedPoint;
 				homogenousPoint(3) = 1;
 				Eigen::Vector4f projectedPoint_planeCos = planeMatrix.inverse() * homogenousPoint;
 
-				if(projectedPoint_planeCos(0)<2.5 & projectedPoint_planeCos(0)>-2.5 & projectedPoint_planeCos(1)>-2.5 & projectedPoint_planeCos(1)<2.5){
-					collisionInliers.push_back((*pointcloud)[j]);
+				if(projectedPoint_planeCos(0)<2.5 && projectedPoint_planeCos(0)>-2.5 && projectedPoint_planeCos(1)>-2.5 && projectedPoint_planeCos(1)<2.5){
+					collisionInliers.push_back(currentPoint);
 
-					collisionMap[(collisionMapSize/5)*(projectedPoint_planeCos(0) + 2.5)][(collisionMapSize/5)*(projectedPoint_planeCos(1)+2.5)] += 1;
+					unsigned int xIndex = (collisionMapSize/5)*(projectedPoint_planeCos(0) + 2.5);
+					unsigned int yIndex = (collisionMapSize/5)*(projectedPoint_planeCos(1) + 2.5);
+					collisionMap[xIndex][yIndex]+=1;
+
+					if(collisionMap[xIndex][yIndex]>maxCount){
+						maxCount = collisionMap[xIndex][yIndex];
+						std::cout<<"Max count: "<<maxCount<<std::endl;
+					}
 				}
 			}
 		}
 	}
 
-	for(unsigned int i = 0; i<collisionMapSize; i++){
-		for(unsigned int j = 0; j<collisionMapSize; j++){
-			std::cout<<collisionMap[i][j]<< " ";
-		}
 
-		std::cout<<std::endl;
-	}
-
-	drawCollisionMap = true;
-
+  for (auto& inner : collisionMap) {
+	  for (auto& item : inner) {
+		  	  if(((float)item/(float)maxCount)>0.1) item = 1;
+		  	  else item = 0;
+	  }
+  }
 }
 
-bool PlaneEstimator::checkCollision(Eigen::Vector4f position){
-	Eigen::Vector4f planeSupportPoint = planeMatrix.col(3);
+bool PlaneEstimator::checkCollision(const Eigen::Vector4f &position){
 	Eigen::Vector4f planeNormal = planeMatrix.col(2).normalized();
 
 	Eigen::Vector4f projectedPoint = position - position.dot(planeNormal)*planeNormal;
 	Eigen::Vector4f projectedPoint_planeCos = planeMatrix.inverse() * projectedPoint;
 
-	if(projectedPoint_planeCos(0)<2.5 & projectedPoint_planeCos(0)>-2.5 & projectedPoint_planeCos(1)>-2.5 & projectedPoint_planeCos(1)<2.5){
-		if(collisionMap[(collisionMapSize/5)*(projectedPoint_planeCos(0) + 2.5)][(collisionMapSize/5)*(projectedPoint_planeCos(1) + 2.5)] > 10) return true;
+	if(projectedPoint_planeCos(0)<2.5 && projectedPoint_planeCos(0)>-2.5 && projectedPoint_planeCos(1)>-2.5 && projectedPoint_planeCos(1)<2.5){
+		if(collisionMap[(collisionMapSize/5)*(projectedPoint_planeCos(0) + 2.5)][(collisionMapSize/5)*(projectedPoint_planeCos(1) + 2.5)] == 1) return true;
 	}
 
 	return false;
 }
 
-void PlaneEstimator::buildOctree(const std::vector<Eigen::Vector3f> * pointcloud){
-	int maxIndex = findMaximumPointIndex(pointcloud);
-	int minIndex = findMinimumPointIndex(pointcloud);
+void PlaneEstimator::calcSceneScale(){
+	std::vector< KeyFrameDisplay *> keyframes = viewer->getGraphDisplay()->getKeyframes();
 
-	Eigen::Vector3f connectionVector = (*pointcloud)[maxIndex] - (*pointcloud)[minIndex];
-	Eigen::Vector3f middle = (*pointcloud)[minIndex] + connectionVector/2;
+	if(keyframes.size()<2) sceneScale = 1;
 
-	octree = new Octree((*pointcloud)[minIndex], middle);
+	float maxDistance = 0;
 
-	OctreePoint * octreePoints = new OctreePoint[pointcloud->size()];
-	for(int i=0; i<pointcloud->size(); ++i) {
-		octreePoints[i].setPosition((*pointcloud)[i]);
-		octree->insert(octreePoints + i);
+	for(unsigned int i =1; i<keyframes.size(); i+=2)
+	{
+		float distance = (keyframes[i]->camToWorld.translation() - keyframes[i-1]->camToWorld.translation()).norm();
+
+		if(distance>maxDistance)
+			maxDistance = distance;
 	}
+
+	sceneScale = maxDistance;
 }
 
-int PlaneEstimator::findMinimumPointIndex(const std::vector<Eigen::Vector3f> * pointcloud){
-	int minIndex = 0;
-	float minNorm = (*pointcloud)[0].norm();
+float PlaneEstimator::getSceneScale(){
+	calcSceneScale();
 
-	for (int i =0; i<pointcloud->size(); i++) {
-		float norm = (*pointcloud)[i].norm();
+	std::cout<<"Scene Scale: "<<sceneScale<<std::endl;
 
-		if(norm < minNorm){
-			minIndex = i;
-			minNorm = norm;
-		}
-	}
+	return sceneScale;
 }
 
-int PlaneEstimator::findMaximumPointIndex(const std::vector<Eigen::Vector3f> * pointcloud){
-	int maxIndex = 0;
-	float maxNorm = (*pointcloud)[0].norm();
 
-	for (int i =0; i<pointcloud->size(); i++) {
-		float norm = (*pointcloud)[i].norm();
-
-		if(norm < maxNorm){
-			maxIndex = i;
-			maxNorm = norm;
-		}
-	}
+/*
+ * void PlaneEstimator::toggleConsensusSetDraw(){
+	drawConsensusSet = !drawConsensusSet;
 }
+
+void PlaneEstimator::toggleCollisionDraw(){
+	drawCollisionMap = !drawCollisionMap;
+}
+
+void PlaneEstimator::togglePlaneDraw(){
+	drawPlane = !drawPlane;
+}
+
+void PlaneEstimator::togglePlaneUpdate(){
+	planeUpdating = !planeUpdating;
+}
+
+ *
+ */
 
 

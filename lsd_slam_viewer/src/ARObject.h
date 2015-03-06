@@ -23,17 +23,14 @@ public:
 	virtual ~ARObject();
 
 	void draw();
-	void moveStraight(int forwBackw);
 	void rotate(int leftRight);
-	void strafe(int leftRight);
-	void updatePlane(Eigen::Vector3f normal, Eigen::Vector3f inlier);
 	void flipNormal();
-	void setPose(Eigen::Matrix4f initialPose);
-	void setNormal(Eigen::Matrix4f planeParameters);
+	void init(const Eigen::Vector4f & cameraViewDirection);
 	void accelerate(int direction);
 	void stop();
 	Eigen::Matrix4f *getPose();
-	void setPlaneEstimator(PlaneEstimator * planeEstimator);
+	void toggleCollisionChecking();
+	int getNormalSign();
 
 private:
 	Eigen::Matrix <float, 4, 4, Eigen::ColMajor> currentPose;
@@ -45,8 +42,11 @@ private:
 
 	PlaneEstimator * planeEstimator;
 
-	float speed;
+	float maxVelocity;
+	float velocity;
+	float acceleration;
 	float rotAngle;
+	int accelerationDirection;
 
 	unsigned int vbo_mesh_vertices, vbo_mesh_normals, ibo_mesh_elements, vbo_mesh_colors;
 
