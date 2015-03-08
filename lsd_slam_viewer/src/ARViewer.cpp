@@ -54,15 +54,18 @@ boost::mutex keyPressMutex;
 boost::condition_variable keyPressCondition;
 int lastKey=0;
 
+unsigned int currentFrameID = 0;
+
 unsigned int idOffset = 0;
 bool firstPop = true;
 PointCloudViewer * _viewer;
+ARViewer* window = 0;
 
 void displayThreadLoop(QApplication* app, PointCloudViewer * viewer)
 {
 
 	_viewer = viewer;
-	ARViewer* window = new ARViewer("AR Viewer", 0, viewer);
+	window = new ARViewer("AR Viewer", 0, viewer);
 
 	printf("started image display thread!\n");
 	boost::unique_lock<boost::mutex> lock(openCVdisplayMutex);
@@ -77,7 +80,7 @@ void displayThreadLoop(QApplication* app, PointCloudViewer * viewer)
 		if(!imageThreadKeepRunning)
 			break;
 
-		while(displayQueue.size() > 0)
+		while(!displayQueue.empty())
 		{
 			window->loadImage(displayQueue.front().img, displayQueue.front().autoSize);
 			window->show();
@@ -85,16 +88,16 @@ void displayThreadLoop(QApplication* app, PointCloudViewer * viewer)
 		}
 	}
 
-	delete [] window;
+	delete window;
 
 	printf("ended image display thread!\n");
 }
+
 void makeDisplayThread()
 {
 	imageThreadKeepRunning = true;
 	//imageDisplayThread = new boost::thread(&displayThreadLoop);
 }
-
 
 void displayImage(const char* windowName, const cv::Mat& image, bool autoSize)
 {
@@ -112,27 +115,29 @@ void displayImage(const char* windowName, const cv::Mat& image, bool autoSize)
 
 void enqueueImage(const sensor_msgs::ImageConstPtr& msg)
 {
-
 	msgQueue.push(msg);
 }
 
-void popImage(unsigned int imageId){
+void popImage(unsigned int frameID){
+	if(currentFrameID>frameID){
+		printf("AR Demo: detected backward-jump in id (%d to %d), resetting!\n", currentFrameID, frameID);
+
+		while(!msgQueue.empty()) msgQueue.pop();
+		if(window!=0) window->reset();
+
+		currentFrameID = frameID;
+
+		firstPop = true;
+	}
 
 	if(msgQueue.empty()) return;
 
-	if((msgQueue.front()->header.seq>imageId+idOffset) || firstPop){
-		std::cout<<"Current ID offset: "<<idOffset<<std::endl;
-		idOffset = msgQueue.front()->header.seq - imageId;
-
-		std::cout<<"Detected reset. Flushing the frame buffer."<<std::endl;
-		std::cout<<"Queue front: "<<msgQueue.front()->header.seq<<std::endl;
-		std::cout<<"popped ID: "<<imageId<<std::endl;
-		std::cout<<"New ID offset: "<<idOffset<<std::endl<<std::endl;
-
+	if(firstPop){
+		idOffset = msgQueue.front()->header.seq - frameID;
 		firstPop = false;
 	}
 
-	while(msgQueue.front()->header.seq<=imageId+idOffset){
+	while(msgQueue.front()->header.seq<frameID+idOffset){
 		cv::Mat image =  cv_bridge::toCvShare(msgQueue.front(), "rgb8")->image;
 
 		displayImage("AR Demo", image, true);
@@ -141,6 +146,8 @@ void popImage(unsigned int imageId){
 
 		if(msgQueue.empty()) break;
 	}
+
+	currentFrameID = frameID;
 }
 
 int waitKey(int milliseconds)
@@ -149,6 +156,7 @@ int waitKey(int milliseconds)
 
 	if(milliseconds == 0)
 	{
+
 		keyPressCondition.wait(lock);
 		return lastKey;
 	}
@@ -157,6 +165,10 @@ int waitKey(int milliseconds)
 		return 0;
 	else
 		return lastKey;
+}
+
+void stopDisplayThreadLoop(){
+	imageDisplayThread = false;
 }
 
 void closeAllWindows()
@@ -185,6 +197,9 @@ ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * viewer)
     this->planeEstimator = new PlaneEstimator(viewer);
     this->arObject = new ARObject(planeEstimator);
     this->benchmarking = new Benchmarking(this);
+
+	viewer->setPlaneEstimator(this->planeEstimator);
+	viewer->setARObject(arObject);
 
     QTimer *timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(update()));
@@ -257,7 +272,7 @@ void ARViewer::paintGL()
 
 		if(ego) {
 
-			Eigen::Matrix4f planeTransformation = planeEstimator->getPlaneParameters();
+			Eigen::Matrix4f planeTransformation = planeEstimator->getPlaneMatrix();
 			Eigen::Matrix4f objectTransformation = *(arObject->getPose());
 
 			Eigen::Matrix4f bufferMatrix = objectTransformation;
@@ -368,21 +383,21 @@ void ARViewer::reset(){
     this->arObject = new ARObject(planeEstimator);
     this->benchmarking = new Benchmarking(this);
 
+	viewer->setPlaneEstimator(this->planeEstimator);
+	viewer->setARObject(arObject);
+
     arDemo = false;
 }
 
 void ARViewer::keyPressEvent(QKeyEvent *ke)
 {
 	switch(ke->key()){
-		case Qt::Key_R:
-			planeEstimator->beginPlaneTracking((Eigen::Vector4f)(viewer->getModelViewMatrix().col(2)));
-			arObject->init(-(Eigen::Vector4f)(viewer->getModelViewMatrix().col(2)));
-			viewer->setPlaneEstimator(this->planeEstimator);
-			viewer->setARObject(arObject);
+		case Qt::Key_R: {
+			Eigen::Vector3f cameraCoordinates ;//= viewer->getCurrentCamDisplay()->camToWorld.matrix().col(3).topRows(3);
+			planeEstimator->beginPlaneTracking(cameraCoordinates);
+			arObject->init(cameraCoordinates);
 			arDemo = true;
-			break;
-		case Qt::Key_A:
-			break;
+		} break;
 		case Qt::Key_Up:
 			arObject->accelerate(-1);
 			break;
@@ -431,6 +446,9 @@ void ARViewer::keyPressEvent(QKeyEvent *ke)
 			break;
 		case Qt::Key_5:
 			benchmarking->ocRansacIterationSensitivitySidelengthBased();
+			break;
+		case Qt::Key_6:
+			benchmarking->ocRansacToleranceSensitivitySidelengthBased();
 			break;
 	}
 

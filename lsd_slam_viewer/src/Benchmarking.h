@@ -39,6 +39,7 @@ public:
 	void ocRansacIterationSensitivity();
 	void ocRansacLeafSizeSensitivitySidelengthBased();
 	void ocRansacIterationSensitivitySidelengthBased();
+	void ocRansacToleranceSensitivitySidelengthBased();
 	void allOctreeBenchmarks();
 
 private:

@@ -25,7 +25,7 @@ public:
 	void draw();
 	void rotate(int leftRight);
 	void flipNormal();
-	void init(const Eigen::Vector4f & cameraViewDirection);
+	void init(const Eigen::Vector3f & cameraCoordinates);
 	void accelerate(int direction);
 	void stop();
 	Eigen::Matrix4f *getPose();

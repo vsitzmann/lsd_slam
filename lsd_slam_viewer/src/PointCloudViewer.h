@@ -172,6 +172,7 @@ public:
 	Eigen::Matrix4f getModelViewMatrix();
 	void setARObject(ARObject * arObject);
 	void setPlaneEstimator(PlaneEstimator * planeEstimator);
+	KeyFrameDisplay* getCurrentCamDisplay();
 
 protected :
 	virtual void draw();
@@ -184,8 +185,6 @@ protected :
 
 
 private:
-	bool drawPlane;
-	bool drawARObject;
 
 	// displays kf-graph
 	KeyFrameGraphDisplay* graphDisplay;
@@ -200,7 +199,6 @@ private:
 
 	// meddle mutex
 	boost::mutex meddleMutex;
-
 
 	void setToVideoSize();
 	bool resetRequested;

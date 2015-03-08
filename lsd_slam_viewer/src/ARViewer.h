@@ -48,14 +48,13 @@ public:
 
     std::string name;
     PointCloudViewer * viewer;
-
+    PlaneEstimator * planeEstimator;
+    ARObject * arObject;
 private:
 
     void showTitlePage();
     void initARDemo();
 private:
-    PlaneEstimator * planeEstimator;
-    ARObject * arObject;
     Benchmarking * benchmarking;
 
     bool arDemo;
@@ -69,6 +68,7 @@ void enqueueImage(const sensor_msgs::ImageConstPtr& msg);
 void popImage(unsigned int imageId);
 int waitKey(int milliseconds);
 void closeAllWindows();
+void stopDisplayThreadLoop();
 
 void displayThreadLoop(QApplication* app=0, PointCloudViewer * viewer = 0);
 

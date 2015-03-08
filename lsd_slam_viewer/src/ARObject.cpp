@@ -30,7 +30,7 @@ using namespace std;
 std::clock_t lastDrawTime = 0;
 
 ARObject::ARObject(PlaneEstimator * planeEstimator) {
-	load_obj("/home/vincent/suzanne.obj");
+	load_obj("/home/vincent/3d models/teacup_2.obj");
 
 	this->planeEstimator = planeEstimator;
 
@@ -40,14 +40,13 @@ ARObject::ARObject(PlaneEstimator * planeEstimator) {
 	maxVelocity = 0;
 	acceleration = 0;
 	accelerationDirection = 0;
-	collisionChecking = false;
 }
 
 ARObject::~ARObject() {
 	// TODO Auto-generated destructor stub
 }
 
-void ARObject::init(const Eigen::Vector4f & cameraViewDirection){
+void ARObject::init(const Eigen::Vector3f & cameraCoordinates){
 	this->currentPose = Eigen::Matrix4f::Identity();
 
 	float sceneScale = planeEstimator->getSceneScale();
@@ -58,8 +57,9 @@ void ARObject::init(const Eigen::Vector4f & cameraViewDirection){
 
 	//Check whether the plane normal points upwards or downwards by calculating the dot product of the
 	//plane normal and the camera's view direction.
-	if(planeEstimator->getPlaneParameters().col(2).dot(planeEstimator->getPlaneParameters().col(2))>0)
+	if(PlaneFittingTools::calcSignedPlanePointDis(planeEstimator->getPlane(), cameraCoordinates)<0){
 		currentPose.col(2) = currentPose.col(2)*(-1);
+	}
 }
 
 Eigen::Matrix4f * ARObject::getPose(){
@@ -90,7 +90,7 @@ void ARObject::draw(){
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLushort)*elements.size(), &elements[0], GL_STATIC_DRAW);
 
 	glPushMatrix();
-		glMultMatrixf(planeEstimator->getPlaneParameters().data());
+		glMultMatrixf(planeEstimator->getPlaneMatrix().data());
 		glMultMatrixf(currentPose.data());
 
 		  glEnableVertexAttribArray(0);

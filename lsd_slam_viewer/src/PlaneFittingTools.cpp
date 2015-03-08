@@ -13,6 +13,8 @@
 #include <cmath>
 #include <random>
 
+typedef Eigen::Matrix<float,Eigen::Dynamic,Eigen::Dynamic, Eigen::RowMajor> MatrixXfrm;
+
 void PlaneFittingTools::ransac(const std::vector<Eigen::Vector3f> &pointcloud, std::vector<Eigen::Vector3f> * inliers, unsigned int iterations,float inlierTolerance, unsigned int scoreDownsampling){
 	unsigned int bestPoints[3] = {0};
 	unsigned int maxInliers = 0;
@@ -69,7 +71,7 @@ void PlaneFittingTools::ransac(const std::vector<Eigen::Vector3f> &pointcloud, s
 	findInliers(pointcloud, inliers, inlierTolerance, plane);
 }
 
-void PlaneFittingTools::octreeRansac(const std::vector<Eigen::Vector3f> &pointcloud, Octree &octree, Eigen::Vector3f * cellIdentifier, std::vector<Eigen::Vector3f> * inliers, unsigned int iterations, float inlierTolerance, unsigned int scoreDownsampling){
+void PlaneFittingTools::octreeRansac(const std::vector<Eigen::Vector3f> &pointcloud, Octree &octree, std::vector<Eigen::Vector3f> * inliers, unsigned int iterations, float inlierTolerance, unsigned int scoreDownsampling){
 	unsigned int maxInliers = 0;
 	Eigen::Vector3f bP1 (0,0,0);
 	Eigen::Vector3f bP2 (0,0,0);
@@ -125,7 +127,6 @@ void PlaneFittingTools::octreeRansac(const std::vector<Eigen::Vector3f> &pointcl
 	inliers->clear();
 	inliers->reserve(maxInliers);
 	findInliers(pointcloud, inliers, inlierTolerance, plane);
-	*cellIdentifier = bP1;
 }
 
 void PlaneFittingTools::findInliers(const std::vector<Eigen::Vector3f> &pointCloud, std::vector<Eigen::Vector3f> * inliers, float inlierTolerance, HessianNormalForm plane){
@@ -199,4 +200,15 @@ Eigen::Matrix3f PlaneFittingTools::pcaPlaneFitting(const std::vector<Eigen::Vect
 	*bitangent =  eig.eigenvectors().col(1);
 
 	return cov;
+}
+
+Eigen::Vector3f PlaneFittingTools::projectPoint(const Eigen::Vector3f &point, const HessianNormalForm & plane){
+	return point - point.dot(plane.normal)*plane.normal;
+}
+
+Eigen::Vector4f PlaneFittingTools::projectPoint(const Eigen::Vector4f &point, const HessianNormalForm & plane){
+	Eigen::Vector4f homogenNormal = Eigen::Vector4f::Ones();
+	homogenNormal.topRows(3) = plane.normal;
+
+	return point - point.dot(homogenNormal)*homogenNormal;
 }

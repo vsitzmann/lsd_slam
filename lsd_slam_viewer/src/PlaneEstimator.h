@@ -14,6 +14,7 @@
 #include "KeyFrameGraphDisplay.h"
 #include "PointCloudViewer.h"
 #include "Octree.h"
+#include "PlaneFittingTools.h"
 
 class PointCloudViewer;
 class KeyFrameGraphDisplay;
@@ -27,8 +28,9 @@ public:
 
 	void flipPlane();
 	void draw();
-	void beginPlaneTracking(const Eigen::Vector4f & cameraViewDirection);
-	Eigen::Matrix4f getPlaneParameters();
+	void beginPlaneTracking(const Eigen::Vector3f & cameraCoordinates);
+	Eigen::Matrix4f getPlaneMatrix();
+	HessianNormalForm getPlane();
 
 	/*** Collision Map ****/
 	bool checkCollision(const Eigen::Vector4f &position);
@@ -60,13 +62,13 @@ private:
 
 	unsigned int keyframeUpdateTracker;
 	unsigned int lastUpdateFrame;
-	Eigen::Vector4f cameraViewDirection;
 
 	bool planeValid;
 	bool planeBuffersValid;
 
 	std::vector<Eigen::Vector3f> plane_vertices;
 
+	HessianNormalForm currentPlane;
 	Eigen::Matrix <float, 4, 4, Eigen::ColMajor> planeMatrix;
 
 	/*** Collision Map ****/
@@ -90,7 +92,7 @@ private:
 
 	/*** Collision Map ***/
 	void initCollisionMap();
-	void createCollisionMap(const Eigen::Vector4f & cameraViewDirection);
+	void createCollisionMap(const Eigen::Vector3f & cameraCoordinates);
 };
 
 #endif /* SRC_PLANEESTIMATOR_H_ */

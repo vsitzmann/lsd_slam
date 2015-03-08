@@ -2,7 +2,7 @@
 * This file is part of LSD-SLAM.
 *
 * Copyright 2013 Jakob Engel <engelj at in dot tum dot de> (Technical University of Munich)
-* For more information see <http://vision.in.tum.de/lsdslam> 
+* For more information see <http://vision.in.tum.de/lsdslam>
 *
 * LSD-SLAM is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -181,8 +181,8 @@ void PointCloudViewer::updateProjectionMatrix(float fx, float fy, float cx, floa
 	projection(1, 1) = 2 * fy / height;
 	projection(1, 2) = -(height-2*cy)/height;
 
-	projection(2, 2) = (-0.1 - 100)/(100 - 0.1); //(-camera()->zNear() - camera()->zFar())/(camera()->zFar() - camera()->zNear());
-	projection(2, 3) = (-2 * 0.1 * 100)/(100 - 0.1);//(-2 * camera()->zNear() * camera()->zFar())/(camera()->zFar() - camera()->zNear());
+	projection(2, 2) = (-0.05 - 100)/(100 - 0.1); //(-camera()->zNear() - camera()->zFar())/(camera()->zFar() - camera()->zNear());
+	projection(2, 3) = (-2 * 0.05 * 100)/(100 - 0.1);//(-2 * camera()->zNear() * camera()->zFar())/(camera()->zFar() - camera()->zNear());
 	projection(3, 2) = -1;
 
 }
@@ -201,6 +201,29 @@ void PointCloudViewer::init()
 {
 	setAnimationPeriod(30);
 	startAnimation();
+
+   GLfloat mat_specular[] = { 0.0, 0.0, 0.0, 1.0 };
+   GLfloat mat_ambient[] = {0,0,0,1};
+   GLfloat mat_diffuse[] = {1,1,1,1};
+   GLfloat light_position[] = { 6.0, 10.0, 15.0, 1.0 };
+
+	glEnable(GL_LIGHTING);                 	//enables lighting
+	glEnable(GL_LIGHT0);                   	//enables a light
+	glLightModeli(GL_LIGHT_MODEL_TWO_SIDE,0);  //sets lighting to one-sided
+
+	glEnable(GL_COLOR_MATERIAL);
+	glColorMaterial(GL_FRONT,GL_DIFFUSE);
+
+	float black[4]={0,0,0,0};
+	glMaterialfv(GL_FRONT,GL_AMBIENT,black);
+	glMaterialfv(GL_FRONT,GL_SPECULAR,black);
+
+
+	glLightfv(GL_LIGHT0,GL_POSITION,light_position);   	//updates the light's position
+	glLightfv(GL_LIGHT0,GL_DIFFUSE,mat_diffuse);    //updates the light's diffuse colour
+	glLightfv(GL_LIGHT0,GL_SPECULAR,mat_specular);  //updates the light's specular colour
+	glLightfv(GL_LIGHT0,GL_AMBIENT,mat_ambient);    //updates the light's ambient colour
+
 }
 
 QString PointCloudViewer::helpString() const
@@ -297,8 +320,10 @@ void PointCloudViewer::draw()
 	if(drawPlane)
 		planeEstimator->draw();
 
+	glEnable(GL_LIGHTING);
 	if(drawARObject)
 		arObject->draw();
+	glDisable(GL_LIGHTING);
 
 	if(followCamera) {
 		glMatrixMode(GL_PROJECTION);
@@ -508,13 +533,12 @@ Eigen::Matrix4f PointCloudViewer::getModelViewMatrix(){
 
 void PointCloudViewer::setPlaneEstimator(PlaneEstimator * planeEstimator){
 	this->planeEstimator = planeEstimator;
-	drawPlane = true;
 }
 
 void PointCloudViewer::setARObject(ARObject * arObject){
 	this->arObject = arObject;
-	drawARObject = true;
 }
 
-
-
+KeyFrameDisplay* PointCloudViewer::getCurrentCamDisplay(){
+	return currentCamDisplay;
+}

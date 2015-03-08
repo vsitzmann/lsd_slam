@@ -18,13 +18,13 @@ struct HessianNormalForm {
 	float originDis;
 };
 
-typedef Eigen::Matrix<float,Eigen::Dynamic,Eigen::Dynamic, Eigen::RowMajor> MatrixXfrm;
-
 class PlaneFittingTools {
 public:
 	static void ransac(const std::vector<Eigen::Vector3f> &pointcloud, std::vector<Eigen::Vector3f> * inliers, unsigned int iterations, float inlierTolerance, unsigned int scoreDownsampling);
-	static void octreeRansac(const std::vector<Eigen::Vector3f> &pointcloud, Octree &octree, Eigen::Vector3f * cellIdentifier, std::vector<Eigen::Vector3f> * inliers, unsigned  int iterations, float inlierTolerance, unsigned int scoreDownsampling);
+	static void octreeRansac(const std::vector<Eigen::Vector3f> &pointcloud, Octree &octree, std::vector<Eigen::Vector3f> * inliers, unsigned  int iterations, float inlierTolerance, unsigned int scoreDownsampling);
 
+	static Eigen::Vector3f projectPoint(const Eigen::Vector3f &point, const HessianNormalForm & plane);
+	static Eigen::Vector4f projectPoint(const Eigen::Vector4f &point, const HessianNormalForm & plane);
 	static float calcSignedPlanePointDis(const HessianNormalForm &plane, const Eigen::Vector3f &P);
 	static Eigen::Vector3f findOutermostPoint(const std::vector<Eigen::Vector3f> & pointcloud);
 	static void calcHessianParameters(const Eigen::Vector3f & P1, const Eigen::Vector3f & P2, const Eigen::Vector3f & P3, HessianNormalForm * plane);

@@ -20,14 +20,15 @@ enum scenes {desktop, room, foodcourt, laboratory};
 float optimTols [] = {0.0691, 0.048, 0.065, 0.098};
 float optimLeafSideLengths [] = {39, 84, 183, 111};
 float octreeTestingTols[] = {0.025, 0.05, 0.075, 0.1};
+float optimLeafSidelengths[] = {20, 50, 19, 50};
 
-scenes currentScene = room;
+scenes currentScene = foodcourt;
 
 Benchmarking::Benchmarking(ARViewer * arViewer) {
 	this->arViewer = arViewer;
 
 	benchmarkIterations = 100;
-	benchDownsampleFactor = 1000;
+	benchDownsampleFactor = 10000;
 
 	srand(time(0));
 
@@ -245,9 +246,8 @@ void Benchmarking::ocRansacLeafSizeSensitivity(){
 
 		for(unsigned int c = 0; c<benchmarkIterations; c++){
 			std::vector<Eigen::Vector3f> inliers;
-			Eigen::Vector3f cellIdentifier;
 			float absTolerance = relTolerance * sceneScale;
-			PlaneFittingTools::octreeRansac(pointcloud, *octree, &cellIdentifier, &inliers, benchRansacIterations, absTolerance, benchDownsampleFactor);
+			PlaneFittingTools::octreeRansac(pointcloud, *octree, &inliers, benchRansacIterations, absTolerance, benchDownsampleFactor);
 
 			if(inliers.empty()) continue;
 			if(inliers.size()<0.05*pointcloud.size()) {
@@ -342,9 +342,8 @@ void Benchmarking::ocRansacLeafSizeSensitivitySidelengthBased(){
 
 			for(unsigned int c = 0; c<benchmarkIterations; c++){
 				std::vector<Eigen::Vector3f> inliers;
-				Eigen::Vector3f cellIdentifier;
 				float absTolerance = relTolerance * sceneScale;
-				PlaneFittingTools::octreeRansac(pointcloud, *octree, &cellIdentifier, &inliers, benchRansacIterations, absTolerance, benchDownsampleFactor);
+				PlaneFittingTools::octreeRansac(pointcloud, *octree, &inliers, benchRansacIterations, absTolerance, benchDownsampleFactor);
 
 				if(inliers.empty()) continue;
 				if(inliers.size()<0.05*pointcloud.size()) {
@@ -429,9 +428,8 @@ void Benchmarking::ocRansacIterationSensitivitySidelengthBased(){
 
 		for(unsigned int c = 0; c<benchmarkIterations; c++){
 			std::vector<Eigen::Vector3f> inliers;
-			Eigen::Vector3f cellIdentifier;
 			float absTolerance = relTolerance * sceneScale;
-			PlaneFittingTools::octreeRansac(pointcloud, *octree, &cellIdentifier, &inliers, iter, absTolerance, benchDownsampleFactor);
+			PlaneFittingTools::octreeRansac(pointcloud, *octree, &inliers, iter, absTolerance, benchDownsampleFactor);
 
 
 			Eigen::Vector3f planeVec1, planeVec2, inlierMean;
@@ -516,9 +514,8 @@ void Benchmarking::ocRansacIterationSensitivity(){
 
 		for(unsigned int c = 0; c<benchmarkIterations; c++){
 			std::vector<Eigen::Vector3f> inliers;
-			Eigen::Vector3f cellIdentifier;
 			float absTolerance = relTolerance * sceneScale;
-			PlaneFittingTools::octreeRansac(pointcloud, *octree, &cellIdentifier, &inliers, iter, absTolerance, benchDownsampleFactor);
+			PlaneFittingTools::octreeRansac(pointcloud, *octree, &inliers, iter, absTolerance, benchDownsampleFactor);
 
 
 			Eigen::Vector3f planeVec1, planeVec2, inlierMean;
@@ -554,6 +551,93 @@ void Benchmarking::ocRansacIterationSensitivity(){
 	}
 
 	writeBufferToFile("OCRANSAC_iter", stream.str());
+}
+
+void Benchmarking::ocRansacToleranceSensitivitySidelengthBased(){
+	std::vector<Eigen::Vector3f> pointcloud;
+	assemblePointcloud(&pointcloud);
+
+	float minTolerance = 0.0000;
+	float maxTolerance = 0.26;
+	float tolStepLength = 0.001;
+	int benchRansacIterations = 300;
+	float absCellSizeFac = optimLeafSidelengths[currentScene] * optimTols[currentScene];
+
+	Octree * octree = new Octree( Eigen::Vector3f(0,0,0), PlaneFittingTools::findOutermostPoint(pointcloud), (float)(absCellSizeFac*sceneScale));
+	for ( auto &i : pointcloud ) {
+		octree->insertSidelenghtBased(i);
+	}
+
+	std::stringstream stream;
+
+	/*** Print the header lines ***/
+	std::cout<<"ORANSAC Tolerance Sensitivity Test - Sidelength-based"<<std::endl;
+	stream<<"ORANSAC Tolerance Sensitivity Test - Sidelength-based"<<std::endl;
+
+	stream<<"Date and time:,"<<dateTime().c_str()<<std::endl;
+	stream<<"Min tolerance:,"<<minTolerance<<std::endl;
+	stream<<"Max minTolerance:,"<<minTolerance<<std::endl;
+	stream<<"Step length:,"<<minTolerance<<std::endl;
+	stream<<"Benchmarking iterations:,"<<benchmarkIterations<<std::endl;
+	stream<<"Absolute cell size factor:,"<<absCellSizeFac<<std::endl;
+	stream<<"Relative cell size factor:,"<<optimLeafSidelengths[currentScene]<<std::endl;
+	stream<<"Downsample factor:,"<<benchDownsampleFactor<<std::endl;
+	stream<<"Scene scale:,"<<sceneScale<<std::endl;
+	stream<<std::endl;
+	stream<<"Tolerance,avgPlaneNormalError,errorVariance"<<std::endl;
+
+	/*** Benchmarking process. ***/
+	for(float tol = minTolerance; tol<=maxTolerance; tol+=tolStepLength){
+		unsigned int littleSupport = 0;
+		long double avgPlaneNormalError = 0;
+		long double M2 = 0;
+		int n = 0;
+
+		if(tol>0.005) tolStepLength = 0.005;
+		if(tol>0.1) tolStepLength = 0.01;
+
+		for(unsigned int c = 0; c<benchmarkIterations; c++){
+			std::vector<Eigen::Vector3f> inliers;
+			float absTolerance = tol * sceneScale;
+			PlaneFittingTools::octreeRansac(pointcloud, *octree, &inliers, benchRansacIterations, absTolerance, benchDownsampleFactor);
+
+			if(inliers.empty()) continue;
+			if(inliers.size()<0.05*pointcloud.size()) {
+				littleSupport++;
+			}
+
+			Eigen::Vector3f planeVec1, planeVec2, inlierMean;
+			PlaneFittingTools::pcaPlaneFitting(inliers, &planeVec1, &planeVec2, &inlierMean);
+
+			Eigen::Vector3f normal = planeVec1.cross(planeVec2).normalized();
+
+			if(normal.dot(inlierMean) < 0 ) normal *= -1;
+
+			long double planeNormalError = normal.dot(groundTruthNormal);
+			if(c>benchmarkIterations-4) std::cout<<planeNormalError<<std::endl;
+
+			//Variance estimator as described by Donald E. Knuth (1998). The Art of Computer Programming.
+			//Iteratively calculates an estimate of the variance as well as the exact mean of a data series.
+			//Since mean is calculated iteratively, a "continue" because of too few inliers does not impact the mean.
+			++n;
+			long double delta = planeNormalError - avgPlaneNormalError;
+			avgPlaneNormalError += delta/n;
+			M2 +=delta*(planeNormalError- avgPlaneNormalError);
+		}
+
+		long double variance = M2/(n-1);
+
+		stream<<tol<<","<<avgPlaneNormalError<<","<<variance;
+
+		if(littleSupport==benchmarkIterations){
+			stream<<",<5% inliers support this plane";
+		}
+		stream<<std::endl;
+
+		std::cout<<tol<<","<<avgPlaneNormalError<<","<<variance<<std::endl<<std::endl;
+	}
+
+	writeBufferToFile("RANSAC_tol", stream.str());
 }
 
 //Assembles the global pointcloud from all keyframe pointclouds *WITH RESPECT TO THE CHOSEN DOWNSAMPLE VALUE*

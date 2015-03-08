@@ -94,7 +94,7 @@ void frameCb(lsd_slam_viewer::keyframeMsgConstPtr msg)
 
 	if(msg->time > lastFrameTime) return;
 
-	popImage((unsigned int)msg->id);
+	if(!msg->isKeyframe) popImage((unsigned int)msg->id);
 
 	if(viewer != 0)
 		viewer->addFrameMsg(msg);
@@ -225,6 +225,7 @@ int main( int argc, char** argv )
 	application.exec();
 
 	printf("Shutting down... \n");
+	stopDisplayThreadLoop();
 	ros::shutdown();
 	rosThread.join();
 	printf("Done. \n");

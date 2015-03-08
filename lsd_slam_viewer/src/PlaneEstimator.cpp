@@ -170,7 +170,7 @@ void PlaneEstimator::draw() {
 	}
 }
 
-void PlaneEstimator::beginPlaneTracking(const Eigen::Vector4f & cameraViewDirection){
+void PlaneEstimator::beginPlaneTracking(const Eigen::Vector3f & cameraCoordinates){
 	std::vector< KeyFrameDisplay *> keyframes = viewer->getGraphDisplay()->getKeyframes();
 
 	calcSceneScale();
@@ -206,9 +206,12 @@ void PlaneEstimator::beginPlaneTracking(const Eigen::Vector4f & cameraViewDirect
 	rot.col(1) = initialBitangent.normalized();
 	rot.col(2) = initialTangent.cross(initialBitangent).normalized();
 
+	currentPlane.normal = rot.col(2);
+	currentPlane.originDis = currentPlane.normal.dot(initialCenter);
+
 	planeMatrix.topLeftCorner(3,3) = rot;
 
-	createCollisionMap(cameraViewDirection);
+	createCollisionMap(cameraCoordinates);
 
 	planeTracking = true;
 	planeBuffersValid = false;
@@ -230,10 +233,9 @@ void PlaneEstimator::ocRansacConsensusSetID(const std::vector<Eigen::Vector3f> &
 		octree->insertSidelenghtBased(i);
 	}
 
-	Eigen::Vector3f cellIdentifier;
-	PlaneFittingTools::octreeRansac(pointcloud, *octree, &cellIdentifier, &consensusSet, ransacIterations, inlierThreshold*sceneScale, downsampleFactor);
+	PlaneFittingTools::octreeRansac(pointcloud, *octree, &consensusSet, ransacIterations, inlierThreshold*sceneScale, downsampleFactor);
 
-	Octree * winnerCell = octree->getLeafContainingPoint(cellIdentifier);
+	Octree * winnerCell = octree->getLeafContainingPoint(consensusSet[0]);
 	octreeCell = winnerCell->data;
 }
 
@@ -308,6 +310,9 @@ void PlaneEstimator::refreshPlane(){
 	rot.col(1) = y;
 	rot.col(2) = z;
 
+	currentPlane.normal = rot.col(2);
+	currentPlane.originDis = currentPlane.normal.dot(initialCenter);
+
 	planeMatrix.topLeftCorner(3,3) = rot;
 
 	planeValid = true;
@@ -315,9 +320,14 @@ void PlaneEstimator::refreshPlane(){
 }
 
 // Get/Set functions
-Eigen::Matrix4f PlaneEstimator::getPlaneParameters(){
+Eigen::Matrix4f PlaneEstimator::getPlaneMatrix(){
 	return planeMatrix;
 }
+
+HessianNormalForm PlaneEstimator::getPlane(){
+	return currentPlane;
+}
+
 
 void PlaneEstimator::initCollisionMap(){
 	collisionMap = std::vector<std::vector<int> > (collisionMapSize);
@@ -327,22 +337,15 @@ void PlaneEstimator::initCollisionMap(){
 	}
 }
 
-void PlaneEstimator::createCollisionMap(const Eigen::Vector4f & cameraViewDirection){
+void PlaneEstimator::createCollisionMap(const Eigen::Vector3f & cameraCoordinates){
 	std::vector<KeyFrameDisplay *> keyframes = viewer->getGraphDisplay()->getKeyframes();
 
 	initCollisionMap();
 	collisionInliers.clear();
 
-	Eigen::Vector3f planeSupportPoint = planeMatrix.col(3).topRows(3);
-
-	HessianNormalForm plane;
-	plane.normal = planeMatrix.col(2).topRows(3).normalized();
-	plane.originDis = plane.normal.dot(planeSupportPoint);
-
-	unsigned int maxCount = 0;
-
 	float normalSign;
-	if(cameraViewDirection.topRows(3).dot(plane.normal)>0) normalSign = 1;
+
+	if(cameraCoordinates.dot(currentPlane.normal)>0) normalSign = 1;
 	else normalSign = -1;
 
 	for(unsigned int i =0; i<keyframes.size(); i++)
@@ -352,48 +355,43 @@ void PlaneEstimator::createCollisionMap(const Eigen::Vector4f & cameraViewDirect
 		for(unsigned int j = 0; j<pointcloud->size(); j++){
 			Eigen::Vector3f currentPoint = (*pointcloud)[j];
 
-			float distance = PlaneFittingTools::calcSignedPlanePointDis(plane, currentPoint) * normalSign;
+			float distance = PlaneFittingTools::calcSignedPlanePointDis(currentPlane, currentPoint) * normalSign;
 
-			if( (distance > 1* inlierThreshold*sceneScale) && (distance< 7*inlierThreshold*sceneScale) ){
-				Eigen::Vector3f projectedPoint = currentPoint - distance*plane.normal;
-				Eigen::Vector4f homogenousPoint = Eigen::Vector4f::Zero();
-				homogenousPoint.topRows(3) = projectedPoint;
-				homogenousPoint(3) = 1;
-				Eigen::Vector4f projectedPoint_planeCos = planeMatrix.inverse() * homogenousPoint;
+			if( (distance > 0) && (distance< 7*inlierThreshold*sceneScale) ){
+				Eigen::Vector3f projectedPoint = PlaneFittingTools::projectPoint(currentPoint, currentPlane);
+				Eigen::Vector4f homogenPoint = Eigen::Vector4f::Ones();
+				homogenPoint.topRows(3) = projectedPoint;
+				Eigen::Vector4f projectedPoint_planeCos = planeMatrix.inverse() * homogenPoint;
 
-				if(projectedPoint_planeCos(0)<2.5 && projectedPoint_planeCos(0)>-2.5 && projectedPoint_planeCos(1)>-2.5 && projectedPoint_planeCos(1)<2.5){
+				if(std::abs( (float) projectedPoint_planeCos[0] )<2.5 && std::abs( (float) projectedPoint_planeCos[1] ) <2.5){
 					collisionInliers.push_back(currentPoint);
 
-					unsigned int xIndex = (collisionMapSize/5)*(projectedPoint_planeCos(0) + 2.5);
-					unsigned int yIndex = (collisionMapSize/5)*(projectedPoint_planeCos(1) + 2.5);
+					unsigned int xIndex = ((float)collisionMapSize/5.0f)*(float)(projectedPoint_planeCos(0) + 2.5);
+					unsigned int yIndex = ((float)collisionMapSize/5.0f)*(float)(projectedPoint_planeCos(1) + 2.5);
 					collisionMap[xIndex][yIndex]+=1;
-
-					if(collisionMap[xIndex][yIndex]>maxCount){
-						maxCount = collisionMap[xIndex][yIndex];
-						std::cout<<"Max count: "<<maxCount<<std::endl;
-					}
 				}
 			}
 		}
 	}
 
 
-  for (auto& inner : collisionMap) {
-	  for (auto& item : inner) {
-		  	  if(((float)item/(float)maxCount)>0.1) item = 1;
-		  	  else item = 0;
+  for (unsigned int i = 0; i<collisionMapSize; i++) {
+	  for (unsigned int j = 0; j<collisionMapSize; j++)  {
+		  	  if(collisionMap[i][j]>30) collisionMap[i][j] = 1;
+		  	  else collisionMap[i][j] = 0;
 	  }
+
+	  std::cout<<std::endl;
   }
 }
 
 bool PlaneEstimator::checkCollision(const Eigen::Vector4f &position){
-	Eigen::Vector4f planeNormal = planeMatrix.col(2).normalized();
 
-	Eigen::Vector4f projectedPoint = position - position.dot(planeNormal)*planeNormal;
-	Eigen::Vector4f projectedPoint_planeCos = planeMatrix.inverse() * projectedPoint;
+	if(std::abs( (float) position[0] )<2.5 && std::abs( (float) position[1] ) <2.5){
+		unsigned int xIndex = ((float)collisionMapSize/5.0f)*(float)(position(0) + 2.5);
+		unsigned int yIndex = ((float)collisionMapSize/5.0f)*(float)(position(1) + 2.5);
 
-	if(projectedPoint_planeCos(0)<2.5 && projectedPoint_planeCos(0)>-2.5 && projectedPoint_planeCos(1)>-2.5 && projectedPoint_planeCos(1)<2.5){
-		if(collisionMap[(collisionMapSize/5)*(projectedPoint_planeCos(0) + 2.5)][(collisionMapSize/5)*(projectedPoint_planeCos(1) + 2.5)] == 1) return true;
+		if(collisionMap[xIndex][yIndex] == 1) return true;
 	}
 
 	return false;

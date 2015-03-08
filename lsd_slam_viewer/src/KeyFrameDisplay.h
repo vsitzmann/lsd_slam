@@ -64,7 +64,6 @@ public:
 
 	int totalPoints, displayedPoints;
 
-
 	// camera pose
 	// may be updated by kf-graph.
 	Sophus::Sim3f camToWorld;
