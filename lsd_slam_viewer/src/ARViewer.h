@@ -63,9 +63,10 @@ private:
     unsigned char* image;
 };
 
+void checkReset(unsigned int poseID);
 void displayImage(const char* windowName, const cv::Mat& image, bool autoSize = true);
 void enqueueImage(const sensor_msgs::ImageConstPtr& msg);
-void popImage(unsigned int imageId);
+void popImage(double timestamp);
 int waitKey(int milliseconds);
 void closeAllWindows();
 void stopDisplayThreadLoop();

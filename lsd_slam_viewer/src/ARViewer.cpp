@@ -118,26 +118,19 @@ void enqueueImage(const sensor_msgs::ImageConstPtr& msg)
 	msgQueue.push(msg);
 }
 
-void popImage(unsigned int frameID){
-	if(currentFrameID>frameID){
-		printf("AR Demo: detected backward-jump in id (%d to %d), resetting!\n", currentFrameID, frameID);
+void checkReset(unsigned int poseId){
+	if(currentFrameID>poseId){
+		printf("AR Demo: detected backward-jump in id (%d to %d), resetting!\n", currentFrameID, poseId);
 
 		while(!msgQueue.empty()) msgQueue.pop();
 		if(window!=0) window->reset();
-
-		currentFrameID = frameID;
-
-		firstPop = true;
 	}
 
-	if(msgQueue.empty()) return;
+	currentFrameID = poseId;
+}
 
-	if(firstPop){
-		idOffset = msgQueue.front()->header.seq - frameID;
-		firstPop = false;
-	}
-
-	while(msgQueue.front()->header.seq<frameID+idOffset){
+void popImage(double timestamp){
+	while(!msgQueue.empty() && (msgQueue.front()->header.stamp.toSec() <= timestamp)){
 		cv::Mat image =  cv_bridge::toCvShare(msgQueue.front(), "rgb8")->image;
 
 		displayImage("AR Demo", image, true);
@@ -146,8 +139,6 @@ void popImage(unsigned int frameID){
 
 		if(msgQueue.empty()) break;
 	}
-
-	currentFrameID = frameID;
 }
 
 int waitKey(int milliseconds)
@@ -168,7 +159,7 @@ int waitKey(int milliseconds)
 }
 
 void stopDisplayThreadLoop(){
-	imageDisplayThread = false;
+	imageThreadKeepRunning = false;
 }
 
 void closeAllWindows()

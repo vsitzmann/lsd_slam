@@ -94,7 +94,10 @@ void frameCb(lsd_slam_viewer::keyframeMsgConstPtr msg)
 
 	if(msg->time > lastFrameTime) return;
 
-	if(!msg->isKeyframe) popImage((unsigned int)msg->id);
+	if(!msg->isKeyframe) {
+		popImage(msg->time);
+		checkReset(msg->id);
+	}
 
 	if(viewer != 0)
 		viewer->addFrameMsg(msg);

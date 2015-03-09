@@ -22,7 +22,7 @@ float optimLeafSideLengths [] = {39, 84, 183, 111};
 float octreeTestingTols[] = {0.025, 0.05, 0.075, 0.1};
 float optimLeafSidelengths[] = {20, 50, 19, 50};
 
-scenes currentScene = foodcourt;
+scenes currentScene = room;
 
 Benchmarking::Benchmarking(ARViewer * arViewer) {
 	this->arViewer = arViewer;
@@ -223,7 +223,7 @@ void Benchmarking::ocRansacLeafSizeSensitivity(){
 	stream<<std::endl;
 
 	stream<<"Iteration,avgPlaneNormalError,errorVariance"<<std::endl;
-	for(float fac = minFactor; fac<=maxFactor; fac+=factorStepLength){
+	for(float fac = minFactor; fac<=maxFactor+0.01; fac+=factorStepLength){
 		if(fac>=0.01) factorStepLength = 0.001;
 		if(fac>=0.1) factorStepLength = 0.01;
 
