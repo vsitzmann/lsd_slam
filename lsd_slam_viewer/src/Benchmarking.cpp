@@ -22,13 +22,13 @@ float optimLeafSideLengths [] = {39, 84, 183, 111};
 float octreeTestingTols[] = {0.025, 0.05, 0.075, 0.1};
 float optimLeafSidelengths[] = {20, 50, 19, 50};
 
-scenes currentScene = room;
+scenes currentScene = desktop;
 
 Benchmarking::Benchmarking(ARViewer * arViewer) {
 	this->arViewer = arViewer;
 
 	benchmarkIterations = 100;
-	benchDownsampleFactor = 10000;
+	benchDownsampleFactor = 1000;
 
 	srand(time(0));
 
@@ -201,9 +201,9 @@ void Benchmarking::ocRansacLeafSizeSensitivity(){
 
 	Octree * octree = 0;
 
-	float factorStepLength = 0.001;
-	float minFactor = 0.001;
-	float maxFactor = 1.01;
+	float factorStepLength = 0.1;
+	float minFactor = 0.1;
+	float maxFactor = 100;
 	float relTolerance = optimTols[currentScene];	//Tolerance relative to scene scale! Will be factored with scene scale automatically.
 	int benchRansacIterations = 300;
 
@@ -223,16 +223,15 @@ void Benchmarking::ocRansacLeafSizeSensitivity(){
 	stream<<std::endl;
 
 	stream<<"Iteration,avgPlaneNormalError,errorVariance"<<std::endl;
-	for(float fac = minFactor; fac<=maxFactor+0.01; fac+=factorStepLength){
-		if(fac>=0.01) factorStepLength = 0.001;
-		if(fac>=0.1) factorStepLength = 0.01;
+	for(float fac = minFactor; fac<=maxFactor; fac+=factorStepLength){
+		if(fac>=1) factorStepLength = 1;
 
 		unsigned int littleSupport = 0;
 
 		std::clock_t test = std::clock();
 
 		delete octree;
-		octree = new Octree( Eigen::Vector3f(0,0,0), PlaneFittingTools::findOutermostPoint(pointcloud), (unsigned int)(pointcloud.size()*fac));
+		octree = new Octree( Eigen::Vector3f(0,0,0), PlaneFittingTools::findOutermostPoint(pointcloud), (unsigned int)(pointcloud.size()*(float)fac/100.0f));
 
 		for ( auto &i : pointcloud ) {
 			octree->insert(i);
@@ -550,6 +549,7 @@ void Benchmarking::ocRansacIterationSensitivity(){
 
 	}
 
+	delete octree;
 	writeBufferToFile("OCRANSAC_iter", stream.str());
 }
 
@@ -637,6 +637,7 @@ void Benchmarking::ocRansacToleranceSensitivitySidelengthBased(){
 		std::cout<<tol<<","<<avgPlaneNormalError<<","<<variance<<std::endl<<std::endl;
 	}
 
+	delete octree;
 	writeBufferToFile("RANSAC_tol", stream.str());
 }
 

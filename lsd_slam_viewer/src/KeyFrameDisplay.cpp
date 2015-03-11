@@ -337,7 +337,7 @@ int KeyFrameDisplay::flushPC(std::ofstream* f)
 	}
 	//	*f << tmpBuffer[i].point[0] << " " << tmpBuffer[i].point[1] << " " << tmpBuffer[i].point[2] << " " << (tmpBuffer[i].color[0] / 255.0) << "\n";
 
-	delete tmpBuffer;
+	delete [] tmpBuffer;
 
 	printf("Done flushing frame %d (%d points)!\n", this->id, num);
 	return num;
@@ -361,9 +361,9 @@ void KeyFrameDisplay::drawPC(float pointSize, float alpha)
 		glEnable(GL_LIGHTING);
 		glDisable(GL_LIGHT1);
 
+	else
 		glLightfv (GL_LIGHT0, GL_AMBIENT, LightColor);
 	}
-	else
 	{
 		glDisable(GL_LIGHTING);
 	}

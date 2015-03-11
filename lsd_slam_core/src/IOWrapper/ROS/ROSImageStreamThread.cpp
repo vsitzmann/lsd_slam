@@ -39,9 +39,11 @@ using namespace cv;
 
 ROSImageStreamThread::ROSImageStreamThread()
 {
+
 	// subscribe
 	vid_channel = nh_.resolveName("image");
 	vid_sub          = nh_.subscribe(vid_channel,1, &ROSImageStreamThread::vidCb, this);
+	printf("Ros core vidChannel: %s\n", vid_channel.c_str());
 
 
 	// wait for cam calib
@@ -127,10 +129,14 @@ void ROSImageStreamThread::vidCb(const sensor_msgs::ImageConstPtr img)
 	lastSEQ = img->header.seq;
 
 	TimestampedMat bufferItem;
-	if(img->header.stamp.toSec() != 0)
+	if(img->header.stamp.toSec() != 0){
+//		printf("Image timestamp: %f\n", img->header.stamp.toSec() );
 		bufferItem.timestamp =  Timestamp(img->header.stamp.toSec());
-	else
+	}
+	else{
+//		printf("Ros timestamp: %f\n", ros::Time::now().toSec());
 		bufferItem.timestamp =  Timestamp(ros::Time::now().toSec());
+	}
 
 	if(undistorter != 0)
 	{

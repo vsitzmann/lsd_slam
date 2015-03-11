@@ -24,6 +24,12 @@ class PointCloudViewer;
 class ARObject;
 class Benchmarking;
 
+struct TimestampedMat
+{
+	cv::Mat image;
+	double timestamp;
+};
+
 struct DisplayImageObect
 {
 	cv::Mat img;
@@ -70,6 +76,7 @@ void popImage(double timestamp);
 int waitKey(int milliseconds);
 void closeAllWindows();
 void stopDisplayThreadLoop();
+void enqueueTimestampedMat(TimestampedMat msg);
 
 void displayThreadLoop(QApplication* app=0, PointCloudViewer * viewer = 0);
 

@@ -25,12 +25,16 @@
 #include <cstdio>
 #include <ctime>
 
+#include <ros/package.h>
+
 using namespace std;
 
 std::clock_t lastDrawTime = 0;
 
 ARObject::ARObject(PlaneEstimator * planeEstimator) {
-	load_obj("/home/vincent/3d models/teacup_2.obj");
+	std::string path = ros::package::getPath("lsd_slam_viewer");
+	std::cout<<ros::package::getPath("ueye")<<std::endl;
+	load_obj(path.append("/resources/suzanne.obj").c_str());
 
 	this->planeEstimator = planeEstimator;
 
@@ -40,6 +44,8 @@ ARObject::ARObject(PlaneEstimator * planeEstimator) {
 	maxVelocity = 0;
 	acceleration = 0;
 	accelerationDirection = 0;
+
+	buffersValid = false;
 }
 
 ARObject::~ARObject() {
@@ -72,22 +78,26 @@ void ARObject::draw(){
 	updatePosition((std::clock()-lastDrawTime)/ (double) CLOCKS_PER_SEC);
 	lastDrawTime = std::clock();
 
-	glGenBuffers(1, &vbo_mesh_vertices);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_mesh_vertices);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector4f)*vertices.size(), &vertices[0], GL_STATIC_DRAW);
+	if(!buffersValid){
+		glDeleteBuffers(1, &vbo_mesh_colors);
+		glDeleteBuffers(1, &vbo_mesh_normals);
+		glDeleteBuffers(1, &vbo_mesh_vertices);
+		glDeleteBuffers(1, &ibo_mesh_elements);
 
-	glGenBuffers(1, &vbo_mesh_normals);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_mesh_normals);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f)*normals.size(), &normals[0], GL_STATIC_DRAW);
+		glGenBuffers(1, &vbo_mesh_vertices);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_mesh_vertices);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector4f)*vertices.size(), &vertices[0], GL_STATIC_DRAW);
 
-	glGenBuffers(1, &vbo_mesh_colors);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_mesh_colors);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f)*colors.size(), &colors[0], GL_STATIC_DRAW);
+		glGenBuffers(1, &vbo_mesh_normals);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_mesh_normals);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f)*normals.size(), &normals[0], GL_STATIC_DRAW);
 
+		glGenBuffers(1, &ibo_mesh_elements);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_mesh_elements);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLushort)*elements.size(), &elements[0], GL_STATIC_DRAW);
 
-	glGenBuffers(1, &ibo_mesh_elements);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_mesh_elements);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLushort)*elements.size(), &elements[0], GL_STATIC_DRAW);
+		buffersValid = true;
+	}
 
 	glPushMatrix();
 		glMultMatrixf(planeEstimator->getPlaneMatrix().data());
@@ -115,30 +125,14 @@ void ARObject::draw(){
 		    0                   // offset of first element
 		  );
 
-		  glEnableVertexAttribArray(1);
-		  glBindBuffer(GL_ARRAY_BUFFER, vbo_mesh_colors);
-		  glVertexAttribPointer(
-		    1, // attribute
-		    3,                  // number of elements per vertex, here (x,y,z)
-		    GL_FLOAT,           // the type of each element
-		    GL_FALSE,           // take our values as-is
-		    0,                  // no extra data between each position
-		    0                   // offset of first element
-		  );
-
+		  glColor3f(1,1,1);
 	 	  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_mesh_elements);
 		  glDrawElements(GL_TRIANGLES, elements.size(), GL_UNSIGNED_SHORT, 0);
 
 		glDisableVertexAttribArray(0);
-		glDisableVertexAttribArray(1);
 		glDisableVertexAttribArray(2);
 
 	glPopMatrix();
-
-	glDeleteBuffers(1, &vbo_mesh_colors);
-	glDeleteBuffers(1, &vbo_mesh_normals);
-	glDeleteBuffers(1, &vbo_mesh_vertices);
-	glDeleteBuffers(1, &ibo_mesh_elements);
 }
 
 void ARObject::rotate(int leftRight){
@@ -174,7 +168,6 @@ void ARObject::load_obj(const char* filename) {
       s >> v[2];
       v[3] = 1.0f;
 
-      colors.push_back(Eigen::Vector3f(1,1,1));
       vertices.push_back(v);
     }  else if (line.substr(0,2) == "f ") {
       istringstream s(line.substr(2));
@@ -203,6 +196,8 @@ void ARObject::load_obj(const char* filename) {
     Eigen::Vector3f normal = cross.normalized();
     normals[ia] = normals[ib] = normals[ic] = normal;
   }
+
+  buffersValid = false;
 }
 
 void ARObject::accelerate(int direction){

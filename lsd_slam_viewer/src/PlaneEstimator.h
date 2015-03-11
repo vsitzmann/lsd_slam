@@ -59,12 +59,15 @@ private:
 
 	unsigned int planeBufferId;
 	unsigned int inlierBufferId;
+	unsigned int octreeBufferId;
+	unsigned int collisionBufferId;
 
 	unsigned int keyframeUpdateTracker;
 	unsigned int lastUpdateFrame;
 
-	bool planeValid;
-	bool planeBuffersValid;
+	bool planeInlierBufferValid;
+	bool octreeBufferValid;
+	bool collisionBufferValid;
 
 	std::vector<Eigen::Vector3f> plane_vertices;
 

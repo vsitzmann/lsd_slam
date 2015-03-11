@@ -49,6 +49,7 @@ std::queue<DisplayImageObect> displayQueue;
 bool imageThreadKeepRunning = true;
 
 std::queue<sensor_msgs::ImageConstPtr> msgQueue;
+std::queue<TimestampedMat> imageQueue;
 
 boost::mutex keyPressMutex;
 boost::condition_variable keyPressCondition;
@@ -118,6 +119,10 @@ void enqueueImage(const sensor_msgs::ImageConstPtr& msg)
 	msgQueue.push(msg);
 }
 
+void enqueueTimestampedMat(TimestampedMat msg){
+	imageQueue.push(msg);
+}
+
 void checkReset(unsigned int poseId){
 	if(currentFrameID>poseId){
 		printf("AR Demo: detected backward-jump in id (%d to %d), resetting!\n", currentFrameID, poseId);
@@ -130,14 +135,9 @@ void checkReset(unsigned int poseId){
 }
 
 void popImage(double timestamp){
-	while(!msgQueue.empty() && (msgQueue.front()->header.stamp.toSec() <= timestamp)){
-		cv::Mat image =  cv_bridge::toCvShare(msgQueue.front(), "rgb8")->image;
-
-		displayImage("AR Demo", image, true);
-
-		msgQueue.pop();
-
-		if(msgQueue.empty()) break;
+	while(!imageQueue.empty() && (imageQueue.front().timestamp<=timestamp)){
+		displayImage("AR Demo", imageQueue.front().image, true);
+		imageQueue.pop();
 	}
 }
 
@@ -200,6 +200,7 @@ ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * viewer)
 ARViewer::~ARViewer()
 {
     if(image != 0) delete[] image;
+    delete benchmarking;
     delete arObject;
     delete planeEstimator;
 }
@@ -262,22 +263,21 @@ void ARViewer::paintGL()
 	glPushMatrix();
 
 		if(ego) {
+			Eigen::Matrix4f transMatrix = Eigen::Matrix4f::Identity();
+			transMatrix(1, 1) = -1;
+			transMatrix(2, 2) = -1;
 
 			Eigen::Matrix4f planeTransformation = planeEstimator->getPlaneMatrix();
 			Eigen::Matrix4f objectTransformation = *(arObject->getPose());
 
 			Eigen::Matrix4f bufferMatrix = objectTransformation;
-			objectTransformation.col(1) = objectTransformation.col(2);
+			objectTransformation.col(1) = -objectTransformation.col(2);
 			objectTransformation.col(0) = -bufferMatrix.col(1);
 			objectTransformation.col(2) = bufferMatrix.col(0);
 
 			Eigen::Matrix4f totalTransformation = planeTransformation*objectTransformation;
 
 			totalTransformation = totalTransformation.inverse();
-
-			Eigen::Matrix4f transMatrix = Eigen::Matrix4f::Identity();
-			transMatrix(1, 1) = -1;
-			transMatrix(2, 2) = -1;
 
 			totalTransformation = transMatrix * totalTransformation;
 

@@ -37,7 +37,6 @@ private:
 
 	vector<Eigen::Vector4f> vertices;
 	vector<Eigen::Vector3f> normals;
-	vector<Eigen::Vector3f> colors;
 	vector<GLushort> elements;
 
 	PlaneEstimator * planeEstimator;
@@ -52,6 +51,8 @@ private:
 
 	void load_obj(const char* filename);
 	void updatePosition(double deltaT);
+
+	bool buffersValid;
 };
 
 #endif /* SRC_AROBJECT_H_ */

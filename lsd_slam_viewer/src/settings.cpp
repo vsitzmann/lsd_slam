@@ -64,3 +64,5 @@ bool egoPerspective = false;
 
 bool collisionChecking = false;
 bool drawCollisionPoints = false;
+
+bool disableARDemo = false;

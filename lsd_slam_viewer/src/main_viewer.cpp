@@ -21,6 +21,7 @@
 #include "ARViewer.h"
 
 #include "ros/ros.h"
+#include <ros/callback_queue.h>
 #include "boost/thread.hpp"
 #include "settings.h"
 #include "PointCloudViewer.h"
@@ -43,7 +44,7 @@
 #include <image_transport/image_transport.h>
 
 PointCloudViewer* viewer = 0;
-
+bool firstFrameCB = true;
 
 void dynConfCb(lsd_slam_viewer::LSDSLAMViewerParamsConfig &config, uint32_t level)
 {
@@ -85,6 +86,7 @@ void dynConfCb(lsd_slam_viewer::LSDSLAMViewerParamsConfig &config, uint32_t leve
 
 	collisionChecking = config.collisionChecking;
 	drawCollisionMap = config.drawCollisionMap;
+	disableARDemo = config.disableARDemo;
 
 
 }
@@ -110,13 +112,38 @@ void graphCb(lsd_slam_viewer::keyframeGraphMsgConstPtr msg)
 
 void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-	enqueueImage(msg);
+	TimestampedMat timestampedMsg;
+	timestampedMsg.image =  cv_bridge::toCvShare(msg, "rgb8")->image;
 
-//	cv::Mat image =  cv_bridge::toCvShare(msg, "rgb8")->image;
-//
-//	displayImage("AR Demo", image, false);
+	timestampedMsg.timestamp = ros::Time::now().toSec();
+
+	enqueueTimestampedMat(timestampedMsg);
 }
 
+void vidCb(const sensor_msgs::ImageConstPtr& img)
+{
+
+	TimestampedMat mat;
+	mat.image =  cv_bridge::toCvShare(img, "rgb8")->image;
+
+	if(img->header.stamp.toSec()!=0){
+		if(firstFrameCB){
+			printf("Using image timestamps.", img->header.stamp.toSec());
+			firstFrameCB = false;
+		}
+		mat.timestamp = img->header.stamp.toSec();
+
+	} else {
+		if(firstFrameCB){
+			printf("Using ROS timestamps.\n", ros::Time::now().toSec());
+			firstFrameCB = false;
+		}
+
+		mat.timestamp = ros::Time::now().toSec();
+	}
+
+	enqueueTimestampedMat(mat);
+}
 
 
 void rosThreadLoop( int argc, char** argv )
@@ -124,6 +151,7 @@ void rosThreadLoop( int argc, char** argv )
 	printf("Started ROS thread\n");
 
 	//glutInit(&argc, argv);
+
 
 	ros::init(argc, argv, "viewer");
 	ROS_INFO("lsd_slam_viewer started");
@@ -138,14 +166,14 @@ void rosThreadLoop( int argc, char** argv )
 	ros::Subscriber keyFrames_sub = nh.subscribe(nh.resolveName("lsd_slam/keyframes"),20, frameCb);
 	ros::Subscriber graph_sub       = nh.subscribe(nh.resolveName("lsd_slam/graph"),10, graphCb);
 
-	image_transport::ImageTransport it(nh);
-	image_transport::Subscriber sub = it.subscribe("/image_raw", 1, imageCallback);
-
+	// subscribe
+	ros::Subscriber vid_sub = nh.subscribe("/image_raw", 1, vidCb);
 
 	ros::spin();
 
 	ros::shutdown();
 
+	stopDisplayThreadLoop();
 	printf("Exiting ROS thread\n");
 
 	exit(1);
@@ -228,7 +256,6 @@ int main( int argc, char** argv )
 	application.exec();
 
 	printf("Shutting down... \n");
-	stopDisplayThreadLoop();
 	ros::shutdown();
 	rosThread.join();
 	printf("Done. \n");

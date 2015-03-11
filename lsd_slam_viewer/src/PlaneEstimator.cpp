@@ -35,8 +35,9 @@ PlaneEstimator::PlaneEstimator(PointCloudViewer * viewer) {
 	generatePlaneVBOs();
 	collisionMapSize = 100;
 
-	planeValid = false;
-	planeBuffersValid = false;
+	planeInlierBufferValid = false;
+	octreeBufferValid = false;
+	collisionBufferValid = false;
 
 	octree = 0;
 	sceneScale = 0;
@@ -79,25 +80,43 @@ void PlaneEstimator::draw() {
 	if(planeTracking){
 		refreshPlane();
 
-		planeBufferId = 0;
-		glGenBuffers(1, &planeBufferId);
-		glBindBuffer(GL_ARRAY_BUFFER, planeBufferId);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * plane_vertices.size(), plane_vertices.data(), GL_STATIC_DRAW);
+		//Since the inliers always change together with the plane, only one bool variable is
+		//required.
+		if(!planeInlierBufferValid){
+			//Since glDeleteBuffers ignores a bufferID of zero, it is no problem to delete
+			//a buffer that has not yet been loaded with data yet.
+			glDeleteBuffers(1, &planeBufferId);
+			planeBufferId = 0;
+			glGenBuffers(1, &planeBufferId);
+			glBindBuffer(GL_ARRAY_BUFFER, planeBufferId);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * plane_vertices.size(), plane_vertices.data(), GL_STATIC_DRAW);
 
-		inlierBufferId = 0;
-		glGenBuffers(1, &inlierBufferId);
-		glBindBuffer(GL_ARRAY_BUFFER, inlierBufferId);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * consensusSet.size(), consensusSet.data(), GL_STATIC_DRAW);
+			glDeleteBuffers(1, &inlierBufferId);
+			inlierBufferId = 0;
+			glGenBuffers(1, &inlierBufferId);
+			glBindBuffer(GL_ARRAY_BUFFER, inlierBufferId);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * consensusSet.size(), consensusSet.data(), GL_STATIC_DRAW);
 
-		unsigned int collisionNetBufferID = 0;
-		glGenBuffers(1, &collisionNetBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, collisionNetBufferID);         // for vertex coordinates
-		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * collisionInliers.size(), collisionInliers.data(), GL_STATIC_DRAW);
+			planeInlierBufferValid = true;
+		}
 
-		unsigned int octreeCellID = 0;
-		glGenBuffers(1, &octreeCellID);
-		glBindBuffer(GL_ARRAY_BUFFER, octreeCellID);         // for vertex coordinates
-		glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * octreeCell.size(), octreeCell.data(), GL_STATIC_DRAW);
+		if(!collisionBufferValid){
+			glDeleteBuffers(1, &collisionBufferId);
+			collisionBufferId = 0;
+			glGenBuffers(1, &collisionBufferId);
+			glBindBuffer(GL_ARRAY_BUFFER, collisionBufferId);         // for vertex coordinates
+			glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * collisionInliers.size(), collisionInliers.data(), GL_STATIC_DRAW);
+			collisionBufferValid = true;
+		}
+
+		if(!octreeBufferValid){
+			glDeleteBuffers(1, &octreeBufferId);
+			octreeBufferId = 0;
+			glGenBuffers(1, &octreeBufferId);
+			glBindBuffer(GL_ARRAY_BUFFER, octreeBufferId);         // for vertex coordinates
+			glBufferData(GL_ARRAY_BUFFER, sizeof(Eigen::Vector3f) * octreeCell.size(), octreeCell.data(), GL_STATIC_DRAW);
+			octreeBufferValid = true;
+		}
 
 		if(drawPlane){
 			glMatrixMode(GL_MODELVIEW);
@@ -117,56 +136,43 @@ void PlaneEstimator::draw() {
 			glPopMatrix();
 		}
 
-		if(drawInlier){
-			glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_VERTEX_ARRAY);
 
-				glPointSize(2);
+			//For better visibility, all special points are drawn in a distinctive color and
+			//a larger size.
+			glPointSize(pointTesselation * 2);
+
+			if(drawInlier){
 				glBindBuffer(GL_ARRAY_BUFFER, inlierBufferId);
 				glVertexPointer(3, GL_FLOAT, sizeof(Eigen::Vector3f), 0);
 				glColor3f(0, 0, 1);
 				glDrawArrays(GL_POINTS, 0, consensusSet.size());
+			}
 
-			glDisableClientState(GL_VERTEX_ARRAY);
-
-			glColor3f(1, 1, 1);
-		}
-
-		if(drawCollisionMap){
-			glEnableClientState(GL_VERTEX_ARRAY);
-
-				glPointSize(2);
-				glBindBuffer(GL_ARRAY_BUFFER, collisionNetBufferID);
+			if(drawCollisionMap){
+				glBindBuffer(GL_ARRAY_BUFFER, collisionBufferId);
 				glVertexPointer(3, GL_FLOAT, sizeof(Eigen::Vector3f), 0);
 				glColor3f(1, 0, 0);
 				glDrawArrays(GL_POINTS, 0, collisionInliers.size());
+			}
 
-			glDisableClientState(GL_VERTEX_ARRAY);
-
-			glColor3f(1, 1, 1);
-		}
-
-		if(drawOctreeCell){
-			glEnableClientState(GL_VERTEX_ARRAY);
-
-				glPointSize(2);
-				glBindBuffer(GL_ARRAY_BUFFER, octreeCellID);
+			if(drawOctreeCell){
+				glBindBuffer(GL_ARRAY_BUFFER, octreeBufferId);
 				glVertexPointer(3, GL_FLOAT, sizeof(Eigen::Vector3f), 0);
 				glColor3f(0, 1, 0);
 				glDrawArrays(GL_POINTS, 0, octreeCell.size());
+			}
 
-			glDisableClientState(GL_VERTEX_ARRAY);
+			glPointSize(pointTesselation);
 
-			glColor3f(1, 1, 1);
-		}
+		glDisableClientState(GL_VERTEX_ARRAY);
+
+		glColor3f(1, 1, 1);
 
 		if(drawOctree && octree!=0){
 			octree->drawOctree();
 		}
 
-		glDeleteBuffers(1, &planeBufferId);
-		glDeleteBuffers(1, &inlierBufferId);
-		glDeleteBuffers(1, &collisionNetBufferID);
-		glDeleteBuffers(1, &octreeCellID);
 	}
 }
 
@@ -214,7 +220,7 @@ void PlaneEstimator::beginPlaneTracking(const Eigen::Vector3f & cameraCoordinate
 	createCollisionMap(cameraCoordinates);
 
 	planeTracking = true;
-	planeBuffersValid = false;
+	planeInlierBufferValid = false;
 }
 
 void PlaneEstimator::ransacConsensusSetID(const std::vector<Eigen::Vector3f> &pointcloud){
@@ -237,6 +243,8 @@ void PlaneEstimator::ocRansacConsensusSetID(const std::vector<Eigen::Vector3f> &
 
 	Octree * winnerCell = octree->getLeafContainingPoint(consensusSet[0]);
 	octreeCell = winnerCell->data;
+
+	octreeBufferValid = false;
 }
 
 
@@ -315,8 +323,7 @@ void PlaneEstimator::refreshPlane(){
 
 	planeMatrix.topLeftCorner(3,3) = rot;
 
-	planeValid = true;
-
+	planeInlierBufferValid = false;
 }
 
 // Get/Set functions
@@ -327,7 +334,6 @@ Eigen::Matrix4f PlaneEstimator::getPlaneMatrix(){
 HessianNormalForm PlaneEstimator::getPlane(){
 	return currentPlane;
 }
-
 
 void PlaneEstimator::initCollisionMap(){
 	collisionMap = std::vector<std::vector<int> > (collisionMapSize);
@@ -383,6 +389,8 @@ void PlaneEstimator::createCollisionMap(const Eigen::Vector3f & cameraCoordinate
 
 	  std::cout<<std::endl;
   }
+
+  collisionBufferValid = false;
 }
 
 bool PlaneEstimator::checkCollision(const Eigen::Vector4f &position){
