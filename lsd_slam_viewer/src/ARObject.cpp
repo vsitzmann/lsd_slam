@@ -79,7 +79,6 @@ void ARObject::draw(){
 	lastDrawTime = std::clock();
 
 	if(!buffersValid){
-		glDeleteBuffers(1, &vbo_mesh_colors);
 		glDeleteBuffers(1, &vbo_mesh_normals);
 		glDeleteBuffers(1, &vbo_mesh_vertices);
 		glDeleteBuffers(1, &ibo_mesh_elements);

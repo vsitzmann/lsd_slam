@@ -59,5 +59,6 @@ extern bool egoPerspective;
 
 extern bool collisionChecking;
 extern bool drawCollisionPoints;
-extern bool disableARDemo;
+extern bool arDemo;
+
 

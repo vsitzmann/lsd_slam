@@ -360,10 +360,9 @@ void KeyFrameDisplay::drawPC(float pointSize, float alpha)
 		LightColor[0] = LightColor[1] = 0;
 		glEnable(GL_LIGHTING);
 		glDisable(GL_LIGHT1);
-
-	else
 		glLightfv (GL_LIGHT0, GL_AMBIENT, LightColor);
 	}
+	else
 	{
 		glDisable(GL_LIGHTING);
 	}

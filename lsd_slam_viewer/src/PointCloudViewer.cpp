@@ -317,13 +317,15 @@ void PointCloudViewer::draw()
 
 	graphDisplay->draw();
 
-	if(drawPlane)
-		planeEstimator->draw();
+	if(arDemo){
+		if(drawPlane)
+			planeEstimator->draw();
 
-	glEnable(GL_LIGHTING);
-	if(drawARObject)
-		arObject->draw();
-	glDisable(GL_LIGHTING);
+		glEnable(GL_LIGHTING);
+		if(drawARObject)
+			arObject->draw();
+		glDisable(GL_LIGHTING);
+	}
 
 	if(followCamera) {
 		glMatrixMode(GL_PROJECTION);

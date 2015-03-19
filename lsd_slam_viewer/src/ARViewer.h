@@ -63,7 +63,6 @@ private:
 private:
     Benchmarking * benchmarking;
 
-    bool arDemo;
 	bool ego;
     int width_img, height_img;
     unsigned char* image;

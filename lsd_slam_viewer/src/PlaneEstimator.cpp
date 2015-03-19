@@ -363,7 +363,7 @@ void PlaneEstimator::createCollisionMap(const Eigen::Vector3f & cameraCoordinate
 
 			float distance = PlaneFittingTools::calcSignedPlanePointDis(currentPlane, currentPoint) * normalSign;
 
-			if( (distance > 0) && (distance< 7*inlierThreshold*sceneScale) ){
+			if( (distance > 2*inlierThreshold*sceneScale) && (distance< 7*inlierThreshold*sceneScale) ){
 				Eigen::Vector3f projectedPoint = PlaneFittingTools::projectPoint(currentPoint, currentPlane);
 				Eigen::Vector4f homogenPoint = Eigen::Vector4f::Ones();
 				homogenPoint.topRows(3) = projectedPoint;
@@ -383,8 +383,13 @@ void PlaneEstimator::createCollisionMap(const Eigen::Vector3f & cameraCoordinate
 
   for (unsigned int i = 0; i<collisionMapSize; i++) {
 	  for (unsigned int j = 0; j<collisionMapSize; j++)  {
-		  	  if(collisionMap[i][j]>30) collisionMap[i][j] = 1;
-		  	  else collisionMap[i][j] = 0;
+		  if(collisionMap[i][j]){
+			  std::cout<<collisionMap[i][j]<<std::endl;
+			  std::cout<<collisionInliers.size()/(collisionMapSize*collisionMapSize*100)<<std::endl<<std::endl;
+		  }
+
+		  if(collisionMap[i][j]>4*collisionInliers.size()/(collisionMapSize*collisionMapSize)) collisionMap[i][j] = 1;
+		  else collisionMap[i][j] = 0;
 	  }
 
 	  std::cout<<std::endl;

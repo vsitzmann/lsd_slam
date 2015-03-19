@@ -86,8 +86,6 @@ void dynConfCb(lsd_slam_viewer::LSDSLAMViewerParamsConfig &config, uint32_t leve
 
 	collisionChecking = config.collisionChecking;
 	drawCollisionMap = config.drawCollisionMap;
-	disableARDemo = config.disableARDemo;
-
 
 }
 

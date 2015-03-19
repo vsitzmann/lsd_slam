@@ -263,23 +263,23 @@ void ARViewer::paintGL()
 	glPushMatrix();
 
 		if(ego) {
-			Eigen::Matrix4f transMatrix = Eigen::Matrix4f::Identity();
-			transMatrix(1, 1) = -1;
-			transMatrix(2, 2) = -1;
 
 			Eigen::Matrix4f planeTransformation = planeEstimator->getPlaneMatrix();
 			Eigen::Matrix4f objectTransformation = *(arObject->getPose());
 
-			Eigen::Matrix4f bufferMatrix = objectTransformation;
-			objectTransformation.col(1) = -objectTransformation.col(2);
-			objectTransformation.col(0) = -bufferMatrix.col(1);
-			objectTransformation.col(2) = bufferMatrix.col(0);
+			planeTransformation.col(3) -= 0.05* planeTransformation.col(2);
+
+			Eigen::Matrix4f buffer = objectTransformation;
+			objectTransformation.col(1) = buffer.col(2);
+			objectTransformation.col(2) = buffer.col(0);
+			objectTransformation.col(0) = -buffer.col(1);
+
 
 			Eigen::Matrix4f totalTransformation = planeTransformation*objectTransformation;
 
 			totalTransformation = totalTransformation.inverse();
 
-			totalTransformation = transMatrix * totalTransformation;
+//			totalTransformation = totalTransformation;
 
 			glLoadMatrixf(totalTransformation.data());
 		} else glLoadMatrixf(viewer->getModelViewMatrix().data());
@@ -297,7 +297,7 @@ void ARViewer::paintGL()
 				planeEstimator->draw();
 
 				glEnable(GL_LIGHTING);
-				if(drawARObject) arObject->draw();
+				if(drawARObject && !ego) arObject->draw();
 				glDisable(GL_LIGHTING);
 			}
 
