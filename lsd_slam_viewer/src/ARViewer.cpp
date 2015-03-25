@@ -81,12 +81,12 @@ void displayThreadLoop(QApplication* app, PointCloudViewer * viewer)
 		if(!imageThreadKeepRunning)
 			break;
 
-		while(!displayQueue.empty())
-		{
-			window->loadImage(displayQueue.front().img, displayQueue.front().autoSize);
-			window->show();
-			displayQueue.pop();
-		}
+//		while(!displayQueue.empty())
+//		{
+//			window->loadImage(displayQueue.front().img, displayQueue.front().autoSize);
+//			window->show();
+//			displayQueue.pop();
+//		}
 	}
 
 	delete window;
@@ -134,9 +134,10 @@ void checkReset(unsigned int poseId){
 	currentFrameID = poseId;
 }
 
+
 void popImage(double timestamp){
 	while(!imageQueue.empty() && (imageQueue.front().timestamp<=timestamp)){
-		displayImage("AR Demo", imageQueue.front().image, true);
+		window->loadImage(imageQueue.front().image, true);
 		imageQueue.pop();
 	}
 }
@@ -236,7 +237,6 @@ void ARViewer::initializeGL()
 void ARViewer::paintGL()
 {
 
-    makeCurrent();
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
 	if(image != 0 && !ego)
@@ -263,23 +263,19 @@ void ARViewer::paintGL()
 	glPushMatrix();
 
 		if(ego) {
-
 			Eigen::Matrix4f planeTransformation = planeEstimator->getPlaneMatrix();
 			Eigen::Matrix4f objectTransformation = *(arObject->getPose());
 
 			planeTransformation.col(3) -= 0.05* planeTransformation.col(2);
 
-			Eigen::Matrix4f buffer = objectTransformation;
-			objectTransformation.col(1) = buffer.col(2);
-			objectTransformation.col(2) = buffer.col(0);
-			objectTransformation.col(0) = -buffer.col(1);
+			Eigen::Matrix4f transMatrix = Eigen::Matrix4f::Zero();
+			transMatrix(0,2) = 1;
+			transMatrix(1,0) = -1;
+			transMatrix(2,1) = 1;
+			transMatrix(3,3) = 1;
 
-
-			Eigen::Matrix4f totalTransformation = planeTransformation*objectTransformation;
-
+			Eigen::Matrix4f totalTransformation = planeTransformation*objectTransformation*transMatrix;
 			totalTransformation = totalTransformation.inverse();
-
-//			totalTransformation = totalTransformation;
 
 			glLoadMatrixf(totalTransformation.data());
 		} else glLoadMatrixf(viewer->getModelViewMatrix().data());

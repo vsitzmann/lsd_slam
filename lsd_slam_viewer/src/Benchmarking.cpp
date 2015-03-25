@@ -15,24 +15,29 @@
 #include <iomanip>
 #include <ctime>
 #include <string>
+#include "settings.h"
 
-enum scenes {desktop, room, foodcourt, laboratory};
 float optimTols [] = {0.0691, 0.048, 0.065, 0.098};
 float optimLeafSideLengths [] = {39, 84, 183, 111};
 float octreeTestingTols[] = {0.025, 0.05, 0.075, 0.1};
 float optimLeafSidelengths[] = {20, 50, 19, 50};
-
-scenes currentScene = desktop;
+Eigen::Vector3f groundTruthNormals [4];
 
 Benchmarking::Benchmarking(ARViewer * arViewer) {
 	this->arViewer = arViewer;
 
 	benchmarkIterations = 100;
+
 	benchDownsampleFactor = 1000;
 
 	srand(time(0));
 
 	readGroundTruthFile();
+
+	groundTruthNormals[0] = Eigen::Vector3f(0.0215894f, 0.794667f, 0.606662f); //Desktop
+	groundTruthNormals[1] = Eigen::Vector3f(-0.125544f, 0.888503f, 0.441363f); //Room
+	groundTruthNormals[2] = Eigen::Vector3f(-0.162747f, 0.657752f, 0.735443f); //Foodcourt
+	groundTruthNormals[3] = Eigen::Vector3f(-0.109438f, 0.929572f, 0.352021f); //Laboratory
 }
 
 Benchmarking::~Benchmarking() {
@@ -47,9 +52,10 @@ void Benchmarking::ransacToleranceSensitivity(){
 	assemblePointcloud(&pointcloud);
 
 	float minTolerance = 0.0000;
-	float maxTolerance = 0.5;
-	float tolStepLength = 0.005;
-	int benchRansacIterations = 290;
+	float maxTolerance = 0.26;
+	float tolStepLength = 0.001;
+	int benchRansacIterations = 300;
+    std::unique_ptr<MeanVarianceEstimator> normalErrorStatistics(new MeanVarianceEstimator());
 
 	std::stringstream stream;
 
@@ -69,9 +75,10 @@ void Benchmarking::ransacToleranceSensitivity(){
 	stream<<"Tolerance,avgPlaneNormalError,error variance"<<std::endl;
 	for(float tol = minTolerance; tol<=maxTolerance; tol+=tolStepLength){
 		unsigned int littleSupport = 0;
-		long double avgPlaneNormalError = 0;
-		long double M2 = 0;
-		int n = 0;
+		normalErrorStatistics->reset();
+
+		if(tol>0.005) tolStepLength = 0.005;
+		if(tol>0.1) tolStepLength = 0.01;
 
 		for(unsigned int c = 0; c<benchmarkIterations; c++){
 			std::vector<Eigen::Vector3f> inliers;
@@ -83,35 +90,24 @@ void Benchmarking::ransacToleranceSensitivity(){
 				littleSupport++;
 			}
 
-			Eigen::Vector3f planeVec1, planeVec2, inlierMean;
-			PlaneFittingTools::pcaPlaneFitting(inliers, &planeVec1, &planeVec2, &inlierMean);
-
-			Eigen::Vector3f normal = planeVec1.cross(planeVec2).normalized();
-
-			if(normal.dot(inlierMean) < 0 ) normal *= -1;
-
-			long double planeNormalError = normal.dot(groundTruthNormal);
+			float planeNormalError = calcErrorFromInliers(inliers);
 			if(c>benchmarkIterations-4) std::cout<<planeNormalError<<std::endl;
 
-			//Variance estimator as described by Donald E. Knuth (1998). The Art of Computer Programming.
-			//Iteratively calculates an estimate of the variance as well as the exact mean of a data series.
-			//Since mean is calculated iteratively, a "continue" because of too few inliers does not impact the mean.
-			++n;
-			long double delta = planeNormalError - avgPlaneNormalError;
-			avgPlaneNormalError += delta/n;
-			M2 +=delta*(planeNormalError- avgPlaneNormalError);
+			normalErrorStatistics->addValue(planeNormalError);
 		}
 
-		long double variance = M2/(n-1);
+		float variance, mean;
+		variance = normalErrorStatistics->getVariance();
+		mean = normalErrorStatistics->getMean();
 
-		stream<<tol<<","<<avgPlaneNormalError<<","<<variance;
+		stream<<tol<<","<<mean<<","<<variance;
 
 		if(littleSupport==benchmarkIterations){
 			stream<<",<5% inliers support this plane";
 		}
 		stream<<std::endl;
 
-		std::cout<<tol<<","<<avgPlaneNormalError<<","<<variance<<std::endl<<std::endl;
+		std::cout<<tol<<","<<mean<<","<<variance<<std::endl<<std::endl;
 	}
 
 	writeBufferToFile("RANSAC_tol", stream.str());
@@ -124,7 +120,9 @@ void Benchmarking::ransacIterationSensitivity(){
 	unsigned int itStepLength = 1;
 	unsigned int minIterations = 1;
 	unsigned int maxIterations = 500;
-	float relTolerance = 0.1;	//Tolerance relative to scene scale! Will be factored with scene scale automatically.
+	float relTolerance = optimTols[benchmarkingScene];	//Tolerance relative to scene scale! Will be factored with scene scale automatically.
+	long double absTolerance = relTolerance * sceneScale;
+	std::unique_ptr<MeanVarianceEstimator> normalErrorStatistics(new MeanVarianceEstimator());
 
 	std::stringstream stream;
 
@@ -143,16 +141,12 @@ void Benchmarking::ransacIterationSensitivity(){
 	stream<<"Iteration,avgPlaneNormalError,errorVariance"<<std::endl;
 	for(unsigned int iter = minIterations; iter<=maxIterations; iter+=itStepLength){
 		unsigned int littleSupport = 0;
-
-		long double avgPlaneNormalError = 0;
-		long double n = 0;
-		long double M2 = 0;
+		normalErrorStatistics->reset();
 
 		if(iter==100) itStepLength = 10;
 
 		for(unsigned int c = 0; c<benchmarkIterations; c++){
 			std::vector<Eigen::Vector3f> inliers;
-			long double absTolerance = relTolerance * sceneScale;
 			PlaneFittingTools::ransac(pointcloud, &inliers, iter, absTolerance, benchDownsampleFactor);
 
 			if(inliers.size()<0.05*pointcloud.size()) {
@@ -160,35 +154,24 @@ void Benchmarking::ransacIterationSensitivity(){
 				continue;
 			}
 
-			Eigen::Vector3f planeVec1, planeVec2, inlierMean;
-			PlaneFittingTools::pcaPlaneFitting(inliers, &planeVec1, &planeVec2, &inlierMean);
-
-			HessianNormalForm plane;
-			plane.normal = planeVec1.cross(planeVec2).normalized();
-			plane.originDis = plane.normal.dot(inlierMean);
-
-			if( (plane).normal.dot(inlierMean) < 0 ) (plane).normal *= -1;
-
-			long double planeNormalError = plane.normal.dot(groundTruthNormal);
+			float planeNormalError = calcErrorFromInliers(inliers);
 			if(c>benchmarkIterations-4) std::cout<<planeNormalError<<std::endl;
 
-			//Variance estimator as described by Donald E. Knuth (1998). The Art of Computer Programming, volume 2: Seminumerical Algorithms, 3rd edn., p. 232. Boston: Addison-Wesley.
-			++n;
-			long double delta = planeNormalError - avgPlaneNormalError;
-			avgPlaneNormalError += delta/n;
-			M2 +=delta*(planeNormalError- avgPlaneNormalError);
+			normalErrorStatistics->addValue(planeNormalError);
 		}
 
-		long double variance = M2/(n-1);
+		float variance, mean;
+		variance = normalErrorStatistics->getVariance();
+		mean = normalErrorStatistics->getMean();
 
-		stream<<iter<<","<<avgPlaneNormalError<<","<<variance;
+		stream<<iter<<","<<mean<<","<<variance;
 
 		if(littleSupport==benchmarkIterations){
 			stream<<",<5% inliers support this plane";
 		}
 		stream<<std::endl;
 
-		std::cout<<iter<<","<<avgPlaneNormalError<<","<<variance<<std::endl;
+		std::cout<<iter<<","<<mean<<","<<variance<<std::endl;
 
 	}
 
@@ -204,8 +187,9 @@ void Benchmarking::ocRansacLeafSizeSensitivity(){
 	float factorStepLength = 0.1;
 	float minFactor = 0.1;
 	float maxFactor = 100;
-	float relTolerance = optimTols[currentScene];	//Tolerance relative to scene scale! Will be factored with scene scale automatically.
+	float relTolerance = optimTols[benchmarkingScene];	//Tolerance relative to scene scale! Will be factored with scene scale automatically.
 	int benchRansacIterations = 300;
+    std::unique_ptr<MeanVarianceEstimator> normalErrorStatistics(new MeanVarianceEstimator());
 
 	std::stringstream stream;
 
@@ -227,6 +211,7 @@ void Benchmarking::ocRansacLeafSizeSensitivity(){
 		if(fac>=1) factorStepLength = 1;
 
 		unsigned int littleSupport = 0;
+		normalErrorStatistics->reset();
 
 		std::clock_t test = std::clock();
 
@@ -239,10 +224,6 @@ void Benchmarking::ocRansacLeafSizeSensitivity(){
 
 		std::cout<<"Built Octree, took "<<(std::clock()-test)/(float)CLOCKS_PER_SEC<<std::endl;
 
-		long double avgPlaneNormalError = 0;
-		int n = 0;
-		long double M2 = 0;
-
 		for(unsigned int c = 0; c<benchmarkIterations; c++){
 			std::vector<Eigen::Vector3f> inliers;
 			float absTolerance = relTolerance * sceneScale;
@@ -253,31 +234,24 @@ void Benchmarking::ocRansacLeafSizeSensitivity(){
 				littleSupport++;
 			}
 
-			Eigen::Vector3f planeVec1, planeVec2, inlierMean;
-			PlaneFittingTools::pcaPlaneFitting(inliers, &planeVec1, &planeVec2, &inlierMean);
-			Eigen::Vector3f normal = planeVec1.cross(planeVec2).normalized();
-			if( normal.dot(inlierMean) < 0 ) normal *= -1;
-
-			long double planeNormalError = normal.dot(groundTruthNormal);
+			float planeNormalError = calcErrorFromInliers(inliers);
 			if(c>benchmarkIterations-4) std::cout<<planeNormalError<<std::endl;
 
-			//Variance estimator as described by Donald E. Knuth (1998). The Art of Computer Programming, volume 2: Seminumerical Algorithms, 3rd edn., p. 232. Boston: Addison-Wesley.
-			++n;
-			float delta = planeNormalError - avgPlaneNormalError;
-			avgPlaneNormalError += delta/n;
-			M2 +=delta*(planeNormalError- avgPlaneNormalError);
+			normalErrorStatistics->addValue(planeNormalError);
 		}
 
-		long double variance = M2/(n-1);
+		float variance, mean;
+		variance = normalErrorStatistics->getVariance();
+		mean = normalErrorStatistics->getMean();
 
-		stream<<fac<<","<<avgPlaneNormalError<<","<<variance;
+		stream<<fac<<","<<mean<<","<<variance;
 
 		if(littleSupport==benchmarkIterations){
 			stream<<",<5% inliers support this plane";
 		}
 		stream<<std::endl;
 
-		std::cout<<fac<<","<<avgPlaneNormalError<<","<<variance<<std::endl;
+		std::cout<<fac<<","<<mean<<","<<variance<<std::endl;
 
 	}
 
@@ -292,95 +266,84 @@ void Benchmarking::ocRansacLeafSizeSensitivitySidelengthBased(){
 
 	Octree * octree = 0;
 
-	for(int d = 0; d<4; d++){
-		float factorStepLength = 0.1;
-		float minFactor = 0.1;
-		float relTolerance = octreeTestingTols[d];	//Tolerance relative to scene scale! Will be factored with scene scale automatically.
-		int benchRansacIterations = 20;
+	float factorStepLength = 0.1;
+	float minFactor = 0.1;
+	float relTolerance = optimTols[benchmarkingScene];	//Tolerance relative to scene scale! Will be factored with scene scale automatically.
+	int benchRansacIterations = 100;
+	std::unique_ptr<MeanVarianceEstimator> normalErrorStatistics(new MeanVarianceEstimator());
 
-		Eigen::Vector3f outermostPoint = PlaneFittingTools::findOutermostPoint(pointcloud);
-		float outermostPointNorm = outermostPoint.norm();
-		float maxFactor = outermostPointNorm / (sceneScale * relTolerance);
+	Eigen::Vector3f outermostPoint = PlaneFittingTools::findOutermostPoint(pointcloud);
+	float outermostPointNorm = outermostPoint.norm();
+	float maxFactor = outermostPointNorm / (sceneScale * relTolerance);
 
-		std::stringstream stream;
+	std::stringstream stream;
 
-		std::cout<<"Octree Leafsize Sensitivity Test - Sidelength-based"<<std::endl;
-		stream<<"Octree Leafsize Sensitivity Test - Sidelength-based"<<std::endl;
+	std::cout<<"Octree Leafsize Sensitivity Test - Sidelength-based"<<std::endl;
+	stream<<"Octree Leafsize Sensitivity Test - Sidelength-based"<<std::endl;
 
-		stream<<"Date and time:,"<<dateTime().c_str()<<std::endl;
-		stream<<"Min factor:,"<<minFactor<<std::endl;
-		stream<<"Max factor:,"<<maxFactor<<std::endl;
-		stream<<"Step length:,"<<factorStepLength<<std::endl;
-		stream<<"Relative tolerance:,"<<relTolerance<<std::endl;
-		stream<<"Ransac iterations:,"<<benchRansacIterations<<std::endl;
-		stream<<"Downsample factor:,"<<benchDownsampleFactor<<std::endl;
-		stream<<"Scene scale:,"<<sceneScale<<std::endl;
-		stream<<std::endl;
+	stream<<"Date and time:,"<<dateTime().c_str()<<std::endl;
+	stream<<"Min factor:,"<<minFactor<<std::endl;
+	stream<<"Max factor:,"<<maxFactor<<std::endl;
+	stream<<"Step length:,"<<factorStepLength<<std::endl;
+	stream<<"Relative tolerance:,"<<relTolerance<<std::endl;
+	stream<<"Ransac iterations:,"<<benchRansacIterations<<std::endl;
+	stream<<"Downsample factor:,"<<benchDownsampleFactor<<std::endl;
+	stream<<"Scene scale:,"<<sceneScale<<std::endl;
+	stream<<std::endl;
 
-		stream<<"Iteration,avgPlaneNormalError,errorVariance"<<std::endl;
+	stream<<"Iteration,avgPlaneNormalError,errorVariance"<<std::endl;
 
-		for(float fac = minFactor; fac<=maxFactor; fac+=factorStepLength){
-			if(fac>=1) factorStepLength = 1;
+	for(float fac = minFactor; fac<=maxFactor; fac+=factorStepLength){
+		if(fac>=1) factorStepLength = 1;
 
-			unsigned int littleSupport = 0;
+		unsigned int littleSupport = 0;
+		normalErrorStatistics->reset();
 
-			std::clock_t test = std::clock();
-
-			delete octree;
-			octree = new Octree( Eigen::Vector3f(0,0,0), outermostPoint, (float)(relTolerance*fac*sceneScale));
-
-			for ( auto &i : pointcloud ) {
-				octree->insertSidelenghtBased(i);
-			}
-
-			std::cout<<"Built Octree, took "<<(std::clock()-test)/(float)CLOCKS_PER_SEC<<std::endl;
-
-			long double avgPlaneNormalError = 0;
-			int n = 0;
-			long double M2 = 0;
-
-			for(unsigned int c = 0; c<benchmarkIterations; c++){
-				std::vector<Eigen::Vector3f> inliers;
-				float absTolerance = relTolerance * sceneScale;
-				PlaneFittingTools::octreeRansac(pointcloud, *octree, &inliers, benchRansacIterations, absTolerance, benchDownsampleFactor);
-
-				if(inliers.empty()) continue;
-				if(inliers.size()<0.05*pointcloud.size()) {
-					littleSupport++;
-				}
-
-				Eigen::Vector3f planeVec1, planeVec2, inlierMean;
-				PlaneFittingTools::pcaPlaneFitting(inliers, &planeVec1, &planeVec2, &inlierMean);
-				Eigen::Vector3f normal = planeVec1.cross(planeVec2).normalized();
-				if( normal.dot(inlierMean) < 0 ) normal *= -1;
-
-				long double planeNormalError = normal.dot(groundTruthNormal);
-				if(c>benchmarkIterations-4) std::cout<<planeNormalError<<std::endl;
-
-				//Variance estimator as described by Donald E. Knuth (1998). The Art of Computer Programming, volume 2: Seminumerical Algorithms, 3rd edn., p. 232. Boston: Addison-Wesley.
-				++n;
-				float delta = planeNormalError - avgPlaneNormalError;
-				avgPlaneNormalError += delta/n;
-				M2 +=delta*(planeNormalError- avgPlaneNormalError);
-			}
-
-			long double variance = M2/(n-1);
-
-			stream<<fac<<","<<avgPlaneNormalError<<","<<variance;
-
-			if(littleSupport==benchmarkIterations){
-				stream<<",<5% inliers support this plane";
-			}
-			stream<<std::endl;
-
-			std::cout<<fac<<","<<avgPlaneNormalError<<","<<variance<<std::endl;
-
-		}
+		std::clock_t test = std::clock();
 
 		delete octree;
+		octree = new Octree( Eigen::Vector3f(0,0,0), outermostPoint, (float)(relTolerance*fac*sceneScale));
 
-		writeBufferToFile("OCRANSAC_leafsize_sidelength", stream.str());
+		for ( auto &i : pointcloud ) {
+			octree->insertSidelenghtBased(i);
+		}
+
+		std::cout<<"Built Octree, took "<<(std::clock()-test)/(float)CLOCKS_PER_SEC<<std::endl;
+
+		for(unsigned int c = 0; c<benchmarkIterations; c++){
+			std::vector<Eigen::Vector3f> inliers;
+			float absTolerance = relTolerance * sceneScale;
+			PlaneFittingTools::octreeRansac(pointcloud, *octree, &inliers, benchRansacIterations, absTolerance, benchDownsampleFactor);
+
+			if(inliers.empty()) continue;
+			if(inliers.size()<0.05*pointcloud.size()) {
+				littleSupport++;
+			}
+
+			float planeNormalError = calcErrorFromInliers(inliers);
+			if(c>benchmarkIterations-4) std::cout<<planeNormalError<<std::endl;
+
+			normalErrorStatistics->addValue(planeNormalError);
+		}
+
+		float variance, mean;
+		variance = normalErrorStatistics->getVariance();
+		mean = normalErrorStatistics->getMean();
+
+		stream<<fac<<","<<mean<<","<<variance;
+
+		if(littleSupport==benchmarkIterations){
+			stream<<",<5% inliers support this plane";
+		}
+		stream<<std::endl;
+
+		std::cout<<fac<<","<<mean<<","<<variance<<std::endl;
+
 	}
+
+	delete octree;
+
+	writeBufferToFile("OCRANSAC_leafsize_sidelength", stream.str());
 }
 
 void Benchmarking::ocRansacIterationSensitivitySidelengthBased(){
@@ -389,9 +352,10 @@ void Benchmarking::ocRansacIterationSensitivitySidelengthBased(){
 
 	unsigned int itStepLength = 1;
 	unsigned int minIterations = 1;
-	unsigned int maxIterations = 500;
-	float relTolerance = optimTols[currentScene];	//Tolerance relative to scene scale! Will be factored with scene scale automatically.
-	float cellSizeFac = optimLeafSideLengths[currentScene];
+	unsigned int maxIterations = 510;
+	float relTolerance = optimTols[benchmarkingScene];	//Tolerance relative to scene scale! Will be factored with scene scale automatically.
+	float cellSizeFac = optimLeafSideLengths[benchmarkingScene];
+    std::unique_ptr<MeanVarianceEstimator> normalErrorStatistics(new MeanVarianceEstimator());
 
 	Octree * octree = new Octree( Eigen::Vector3f(0,0,0), PlaneFittingTools::findOutermostPoint(pointcloud), (float)(cellSizeFac*sceneScale*relTolerance));
 	for ( auto &i : pointcloud ) {
@@ -417,11 +381,9 @@ void Benchmarking::ocRansacIterationSensitivitySidelengthBased(){
 
 	/*** Benchmarking process. ***/
 	for(unsigned int iter = minIterations; iter<=maxIterations; iter+=itStepLength){
-		float avgPlaneNormalError = 0;
-		int n = 0;
-		float M2 = 0;
-
 		unsigned int littleSupport = 0;
+		normalErrorStatistics->reset();
+
 
 		if(iter==100) itStepLength = 10;
 
@@ -430,37 +392,24 @@ void Benchmarking::ocRansacIterationSensitivitySidelengthBased(){
 			float absTolerance = relTolerance * sceneScale;
 			PlaneFittingTools::octreeRansac(pointcloud, *octree, &inliers, iter, absTolerance, benchDownsampleFactor);
 
-
-			Eigen::Vector3f planeVec1, planeVec2, inlierMean;
-			PlaneFittingTools::pcaPlaneFitting(inliers, &planeVec1, &planeVec2, &inlierMean);
-
-			HessianNormalForm plane;
-			plane.normal = planeVec1.cross(planeVec2).normalized();
-			plane.originDis = plane.normal.dot(inlierMean);
-
-			if( (plane).normal.dot(inlierMean) < 0 ) (plane).normal *= -1;
-
-			float planeNormalError = plane.normal.dot(groundTruthNormal);
+			float planeNormalError = calcErrorFromInliers(inliers);
 			if(c>benchmarkIterations-4) std::cout<<planeNormalError<<std::endl;
 
-			//Variance estimator as described by Donald E. Knuth (1998). The Art of Computer Programming, volume 2: Seminumerical Algorithms, 3rd edn., p. 232. Boston: Addison-Wesley.
-			++n;
-			float delta = planeNormalError - avgPlaneNormalError;
-			avgPlaneNormalError += delta/n;
-			M2 +=delta*(planeNormalError- avgPlaneNormalError);
+			normalErrorStatistics->addValue(planeNormalError);
 		}
 
-		float variance = M2/(n-1);
+		float variance, mean;
+		variance = normalErrorStatistics->getVariance();
+		mean = normalErrorStatistics->getMean();
 
-		stream<<iter<<","<<avgPlaneNormalError<<","<<variance;
+		stream<<iter<<","<<mean<<","<<variance;
 
 		if(littleSupport==benchmarkIterations){
 			stream<<",<5% inliers support this plane";
 		}
 		stream<<std::endl;
 
-		std::cout<<iter<<","<<avgPlaneNormalError<<","<<variance<<std::endl;
-
+		std::cout<<iter<<","<<mean<<","<<variance;
 	}
 
 	delete octree;
@@ -476,8 +425,9 @@ void Benchmarking::ocRansacIterationSensitivity(){
 	unsigned int itStepLength = 1;
 	unsigned int minIterations = 1;
 	unsigned int maxIterations = 500;
-	float relTolerance = optimTols[currentScene];	//Tolerance relative to scene scale! Will be factored with scene scale automatically.
+	float relTolerance = optimTols[benchmarkingScene];	//Tolerance relative to scene scale! Will be factored with scene scale automatically.
 	float cellSizeFac = 0.32;
+    std::unique_ptr<MeanVarianceEstimator> normalErrorStatistics(new MeanVarianceEstimator());
 
 	Octree * octree = new Octree( Eigen::Vector3f(0,0,0), PlaneFittingTools::findOutermostPoint(pointcloud), (unsigned int)(pointcloud.size()*cellSizeFac));
 	for ( auto &i : pointcloud ) {
@@ -503,10 +453,8 @@ void Benchmarking::ocRansacIterationSensitivity(){
 
 	/*** Benchmarking process. ***/
 	for(unsigned int iter = minIterations; iter<=maxIterations; iter+=itStepLength){
-		float avgPlaneNormalError = 0;
-		int n = 0;
-		float M2 = 0;
 
+		normalErrorStatistics->reset();
 		unsigned int littleSupport = 0;
 
 		if(iter==100) itStepLength = 10;
@@ -516,36 +464,24 @@ void Benchmarking::ocRansacIterationSensitivity(){
 			float absTolerance = relTolerance * sceneScale;
 			PlaneFittingTools::octreeRansac(pointcloud, *octree, &inliers, iter, absTolerance, benchDownsampleFactor);
 
-
-			Eigen::Vector3f planeVec1, planeVec2, inlierMean;
-			PlaneFittingTools::pcaPlaneFitting(inliers, &planeVec1, &planeVec2, &inlierMean);
-
-			HessianNormalForm plane;
-			plane.normal = planeVec1.cross(planeVec2).normalized();
-			plane.originDis = plane.normal.dot(inlierMean);
-
-			if( (plane).normal.dot(inlierMean) < 0 ) (plane).normal *= -1;
-
-			float planeNormalError = plane.normal.dot(groundTruthNormal);
+			float planeNormalError = calcErrorFromInliers(inliers);
 			if(c>benchmarkIterations-4) std::cout<<planeNormalError<<std::endl;
 
-			//Variance estimator as described by Donald E. Knuth (1998). The Art of Computer Programming, volume 2: Seminumerical Algorithms, 3rd edn., p. 232. Boston: Addison-Wesley.
-			++n;
-			float delta = planeNormalError - avgPlaneNormalError;
-			avgPlaneNormalError += delta/n;
-			M2 +=delta*(planeNormalError- avgPlaneNormalError);
+			normalErrorStatistics->addValue(planeNormalError);
 		}
 
-		float variance = M2/(n-1);
+		float variance, mean;
+		variance = normalErrorStatistics->getVariance();
+		mean = normalErrorStatistics->getMean();
 
-		stream<<iter<<","<<avgPlaneNormalError<<","<<variance;
+		stream<<iter<<","<<mean<<","<<variance;
 
 		if(littleSupport==benchmarkIterations){
 			stream<<",<5% inliers support this plane";
 		}
 		stream<<std::endl;
 
-		std::cout<<iter<<","<<avgPlaneNormalError<<","<<variance<<std::endl;
+		std::cout<<iter<<","<<mean<<","<<variance<<std::endl;
 
 	}
 
@@ -561,7 +497,8 @@ void Benchmarking::ocRansacToleranceSensitivitySidelengthBased(){
 	float maxTolerance = 0.26;
 	float tolStepLength = 0.001;
 	int benchRansacIterations = 300;
-	float absCellSizeFac = optimLeafSidelengths[currentScene] * optimTols[currentScene];
+	float absCellSizeFac = optimLeafSidelengths[benchmarkingScene] * optimTols[benchmarkingScene];
+    std::unique_ptr<MeanVarianceEstimator> normalErrorStatistics(new MeanVarianceEstimator());
 
 	Octree * octree = new Octree( Eigen::Vector3f(0,0,0), PlaneFittingTools::findOutermostPoint(pointcloud), (float)(absCellSizeFac*sceneScale));
 	for ( auto &i : pointcloud ) {
@@ -580,7 +517,7 @@ void Benchmarking::ocRansacToleranceSensitivitySidelengthBased(){
 	stream<<"Step length:,"<<minTolerance<<std::endl;
 	stream<<"Benchmarking iterations:,"<<benchmarkIterations<<std::endl;
 	stream<<"Absolute cell size factor:,"<<absCellSizeFac<<std::endl;
-	stream<<"Relative cell size factor:,"<<optimLeafSidelengths[currentScene]<<std::endl;
+	stream<<"Relative cell size factor:,"<<optimLeafSidelengths[benchmarkingScene]<<std::endl;
 	stream<<"Downsample factor:,"<<benchDownsampleFactor<<std::endl;
 	stream<<"Scene scale:,"<<sceneScale<<std::endl;
 	stream<<std::endl;
@@ -589,9 +526,7 @@ void Benchmarking::ocRansacToleranceSensitivitySidelengthBased(){
 	/*** Benchmarking process. ***/
 	for(float tol = minTolerance; tol<=maxTolerance; tol+=tolStepLength){
 		unsigned int littleSupport = 0;
-		long double avgPlaneNormalError = 0;
-		long double M2 = 0;
-		int n = 0;
+		normalErrorStatistics->reset();
 
 		if(tol>0.005) tolStepLength = 0.005;
 		if(tol>0.1) tolStepLength = 0.01;
@@ -606,39 +541,28 @@ void Benchmarking::ocRansacToleranceSensitivitySidelengthBased(){
 				littleSupport++;
 			}
 
-			Eigen::Vector3f planeVec1, planeVec2, inlierMean;
-			PlaneFittingTools::pcaPlaneFitting(inliers, &planeVec1, &planeVec2, &inlierMean);
-
-			Eigen::Vector3f normal = planeVec1.cross(planeVec2).normalized();
-
-			if(normal.dot(inlierMean) < 0 ) normal *= -1;
-
-			long double planeNormalError = normal.dot(groundTruthNormal);
+			float planeNormalError = calcErrorFromInliers(inliers);
 			if(c>benchmarkIterations-4) std::cout<<planeNormalError<<std::endl;
 
-			//Variance estimator as described by Donald E. Knuth (1998). The Art of Computer Programming.
-			//Iteratively calculates an estimate of the variance as well as the exact mean of a data series.
-			//Since mean is calculated iteratively, a "continue" because of too few inliers does not impact the mean.
-			++n;
-			long double delta = planeNormalError - avgPlaneNormalError;
-			avgPlaneNormalError += delta/n;
-			M2 +=delta*(planeNormalError- avgPlaneNormalError);
+			normalErrorStatistics->addValue(planeNormalError);
 		}
 
-		long double variance = M2/(n-1);
+		float variance, mean;
+		variance = normalErrorStatistics->getVariance();
+		mean = normalErrorStatistics->getMean();
 
-		stream<<tol<<","<<avgPlaneNormalError<<","<<variance;
+		stream<<tol<<","<<mean<<","<<variance;
 
 		if(littleSupport==benchmarkIterations){
 			stream<<",<5% inliers support this plane";
 		}
 		stream<<std::endl;
 
-		std::cout<<tol<<","<<avgPlaneNormalError<<","<<variance<<std::endl<<std::endl;
+		std::cout<<tol<<","<<mean<<","<<variance<<std::endl<<std::endl;
 	}
 
 	delete octree;
-	writeBufferToFile("RANSAC_tol", stream.str());
+	writeBufferToFile("OCRANSAC_tol", stream.str());
 }
 
 //Assembles the global pointcloud from all keyframe pointclouds *WITH RESPECT TO THE CHOSEN DOWNSAMPLE VALUE*
@@ -717,3 +641,56 @@ std::string Benchmarking::dateTime(){
 
    return str;
 }
+
+float Benchmarking::calcErrorFromInliers(const std::vector<Eigen::Vector3f> & inliers){
+	Eigen::Vector3f planeVec1, planeVec2, inlierMean;
+	PlaneFittingTools::pcaPlaneFitting(inliers, &planeVec1, &planeVec2, &inlierMean);
+
+	Eigen::Vector3f normal = planeVec1.cross(planeVec2).normalized();
+
+	if(normal.dot(inlierMean) < 0 ) normal *= -1;
+	float dotProduct = normal.dot(groundTruthNormals[benchmarkingScene]);
+	if(dotProduct>1) return 0;
+
+	float planeNormalError = acos(dotProduct)*180.0f/M_PI;
+
+	return planeNormalError;
+}
+
+
+//Variance estimator as described by Donald E. Knuth (1998). The Art of Computer Programming, volume 2: Seminumerical Algorithms, 3rd edn., p. 232. Boston: Addison-Wesley.
+MeanVarianceEstimator::MeanVarianceEstimator(){
+	reset();
+}
+
+MeanVarianceEstimator::~MeanVarianceEstimator(){
+
+}
+
+float MeanVarianceEstimator::getVariance(){
+	return M2/(n-1);
+}
+
+float MeanVarianceEstimator::getMean(){
+	return mean;
+}
+
+void MeanVarianceEstimator::reset(){
+	n = 0;
+	M2 = 0.0;
+	mean = 0.0;
+}
+
+
+void MeanVarianceEstimator::addValue(float value){
+
+	++n;
+	long double delta = value - mean;
+	mean += delta/n;
+	M2 += delta*(value - mean);
+}
+
+
+
+
+

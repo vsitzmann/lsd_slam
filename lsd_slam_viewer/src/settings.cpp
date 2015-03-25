@@ -66,3 +66,5 @@ bool collisionChecking = false;
 bool drawCollisionPoints = false;
 
 bool arDemo = false;
+
+int benchmarkingScene = 0;

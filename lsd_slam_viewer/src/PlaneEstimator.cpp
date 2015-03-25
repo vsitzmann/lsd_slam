@@ -383,16 +383,9 @@ void PlaneEstimator::createCollisionMap(const Eigen::Vector3f & cameraCoordinate
 
   for (unsigned int i = 0; i<collisionMapSize; i++) {
 	  for (unsigned int j = 0; j<collisionMapSize; j++)  {
-		  if(collisionMap[i][j]){
-			  std::cout<<collisionMap[i][j]<<std::endl;
-			  std::cout<<collisionInliers.size()/(collisionMapSize*collisionMapSize*100)<<std::endl<<std::endl;
-		  }
-
 		  if(collisionMap[i][j]>4*collisionInliers.size()/(collisionMapSize*collisionMapSize)) collisionMap[i][j] = 1;
 		  else collisionMap[i][j] = 0;
 	  }
-
-	  std::cout<<std::endl;
   }
 
   collisionBufferValid = false;

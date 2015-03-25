@@ -138,6 +138,7 @@ void PointCloudViewer::addFrameMsg(lsd_slam_viewer::keyframeMsgConstPtr msg)
 			printf("detected backward-jump in id (%d to %d), resetting!\n", currentCamDisplay->id, msg->id);
 			resetRequested = true;
 		}
+		
 		currentCamDisplay->setFrom(msg);
 		lastAnimTime = lastCamTime = msg->time;
 		lastCamID = msg->id;
@@ -318,8 +319,7 @@ void PointCloudViewer::draw()
 	graphDisplay->draw();
 
 	if(arDemo){
-		if(drawPlane)
-			planeEstimator->draw();
+		planeEstimator->draw();
 
 		glEnable(GL_LIGHTING);
 		if(drawARObject)

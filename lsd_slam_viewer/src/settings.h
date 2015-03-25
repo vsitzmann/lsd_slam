@@ -61,4 +61,5 @@ extern bool collisionChecking;
 extern bool drawCollisionPoints;
 extern bool arDemo;
 
+extern int benchmarkingScene;
 

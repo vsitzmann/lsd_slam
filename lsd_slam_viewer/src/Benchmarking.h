@@ -16,6 +16,21 @@
 class PlaneEstimator;
 class ARViewer;
 
+class MeanVarianceEstimator{
+public:
+	MeanVarianceEstimator();
+	virtual ~MeanVarianceEstimator();
+	void addValue(float value);
+	float getVariance();
+	float getMean();
+	void reset();
+
+	float mean;
+private:
+	int n;
+	float M2;
+};
+
 class Benchmarking {
 public:
 	Benchmarking(	ARViewer *arViewer);
@@ -48,7 +63,7 @@ private:
 	void writeBufferToFile(std::string filename, std::string content);
 	void readGroundTruthFile();
 	void readConfigFile();
-
+	float calcErrorFromInliers(const std::vector<Eigen::Vector3f> & inliers);
 	std::string dateTime();
 
 
