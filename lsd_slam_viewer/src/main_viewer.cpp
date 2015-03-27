@@ -44,6 +44,7 @@
 #include <image_transport/image_transport.h>
 
 PointCloudViewer* viewer = 0;
+ARViewer * arViewer = 0;
 bool firstFrameCB = true;
 
 void dynConfCb(lsd_slam_viewer::LSDSLAMViewerParamsConfig &config, uint32_t level)
@@ -96,8 +97,7 @@ void frameCb(lsd_slam_viewer::keyframeMsgConstPtr msg)
 	if(msg->time > lastFrameTime) return;
 
 	if(!msg->isKeyframe) {
-		popImage(msg->time);
-		checkReset(msg->id);
+		arViewer->popImage(msg->time);
 	}
 
 	if(viewer != 0)
@@ -109,16 +109,6 @@ void graphCb(lsd_slam_viewer::keyframeGraphMsgConstPtr msg)
 		viewer->addGraphMsg(msg);
 }
 
-void imageCallback(const sensor_msgs::ImageConstPtr& msg)
-{
-	TimestampedMat timestampedMsg;
-	timestampedMsg.image =  cv_bridge::toCvShare(msg, "rgb8")->image;
-
-	timestampedMsg.timestamp = ros::Time::now().toSec();
-
-	enqueueTimestampedMat(timestampedMsg);
-}
-
 void vidCb(const sensor_msgs::ImageConstPtr& img)
 {
 
@@ -127,21 +117,21 @@ void vidCb(const sensor_msgs::ImageConstPtr& img)
 
 	if(img->header.stamp.toSec()!=0){
 		if(firstFrameCB){
-			printf("Using image timestamps.", img->header.stamp.toSec());
+			printf("Using image timestamps.");
 			firstFrameCB = false;
 		}
 		mat.timestamp = img->header.stamp.toSec();
 
 	} else {
 		if(firstFrameCB){
-			printf("Using ROS timestamps.\n", ros::Time::now().toSec());
+			printf("Using ROS timestamps.\n");
 			firstFrameCB = false;
 		}
 
 		mat.timestamp = ros::Time::now().toSec();
 	}
 
-	enqueueTimestampedMat(mat);
+	arViewer->enqueueTimestampedMat(mat);
 }
 
 
@@ -172,7 +162,6 @@ void rosThreadLoop( int argc, char** argv )
 
 	ros::shutdown();
 
-	stopDisplayThreadLoop();
 	printf("Exiting ROS thread\n");
 
 	exit(1);
@@ -225,8 +214,9 @@ int main( int argc, char** argv )
 	// Read command lines arguments.
 	QApplication application(argc,argv);
 
-	// Instantiate the viewer.
+	// Instantiate the viewers.
 	viewer = new PointCloudViewer();
+	arViewer = new ARViewer("AR Demo", 0, viewer);
 
 	#if QT_VERSION < 0x040000
 		// Set the viewer as the application main widget.
@@ -249,8 +239,6 @@ int main( int argc, char** argv )
 		// start ROS thread
 		rosThread = boost::thread(rosThreadLoop, argc, argv);
 	}
-
-	displayThreadLoop(&application, viewer);
 
 	application.exec();
 

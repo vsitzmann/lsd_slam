@@ -44,13 +44,6 @@ const bool useImageDisplayThread = true;
 boost::mutex openCVdisplayMutex;
 boost::condition_variable  openCVdisplaySignal;
 
-boost::thread* imageDisplayThread = 0;
-std::queue<DisplayImageObect> displayQueue;
-bool imageThreadKeepRunning = true;
-
-std::queue<sensor_msgs::ImageConstPtr> msgQueue;
-std::queue<TimestampedMat> imageQueue;
-
 boost::mutex keyPressMutex;
 boost::condition_variable keyPressCondition;
 int lastKey=0;
@@ -62,112 +55,7 @@ bool firstPop = true;
 PointCloudViewer * _viewer;
 ARViewer* window = 0;
 
-void displayThreadLoop(QApplication* app, PointCloudViewer * viewer)
-{
-
-	_viewer = viewer;
-	window = new ARViewer("AR Viewer", 0, viewer);
-
-	printf("started image display thread!\n");
-	boost::unique_lock<boost::mutex> lock(openCVdisplayMutex);
-
-	while(imageThreadKeepRunning)
-	{
-		lock.unlock();
-		usleep(10000);
-		app->processEvents();
-		lock.lock();
-
-		if(!imageThreadKeepRunning)
-			break;
-
-//		while(!displayQueue.empty())
-//		{
-//			window->loadImage(displayQueue.front().img, displayQueue.front().autoSize);
-//			window->show();
-//			displayQueue.pop();
-//		}
-	}
-
-	delete window;
-
-	printf("ended image display thread!\n");
-}
-
-void makeDisplayThread()
-{
-	imageThreadKeepRunning = true;
-	//imageDisplayThread = new boost::thread(&displayThreadLoop);
-}
-
-void displayImage(const char* windowName, const cv::Mat& image, bool autoSize)
-{
-	if(useImageDisplayThread)
-	{
-		boost::unique_lock<boost::mutex> lock(openCVdisplayMutex);
-		displayQueue.push(DisplayImageObect());
-		displayQueue.back().autoSize = autoSize;
-		displayQueue.back().img = image.clone();
-		displayQueue.back().name = windowName;
-
-		openCVdisplaySignal.notify_one();
-	}
-}
-
-void enqueueImage(const sensor_msgs::ImageConstPtr& msg)
-{
-	msgQueue.push(msg);
-}
-
-void enqueueTimestampedMat(TimestampedMat msg){
-	imageQueue.push(msg);
-}
-
-void checkReset(unsigned int poseId){
-	if(currentFrameID>poseId){
-		printf("AR Demo: detected backward-jump in id (%d to %d), resetting!\n", currentFrameID, poseId);
-
-		while(!msgQueue.empty()) msgQueue.pop();
-		if(window!=0) window->reset();
-	}
-
-	currentFrameID = poseId;
-}
-
-
-void popImage(double timestamp){
-	while(!imageQueue.empty() && (imageQueue.front().timestamp<=timestamp)){
-		window->loadImage(imageQueue.front().image, true);
-		imageQueue.pop();
-	}
-}
-
-int waitKey(int milliseconds)
-{
-	boost::unique_lock<boost::mutex> lock(keyPressMutex);
-
-	if(milliseconds == 0)
-	{
-
-		keyPressCondition.wait(lock);
-		return lastKey;
-	}
-
-	if(!keyPressCondition.timed_wait(lock, boost::posix_time::milliseconds(milliseconds)))
-		return 0;
-	else
-		return lastKey;
-}
-
-void stopDisplayThreadLoop(){
-	imageThreadKeepRunning = false;
-}
-
-void closeAllWindows()
-{
-	return;
-
-}
+std::clock_t currentFrameTime = 0;
 
 ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * viewer) :
     QGLWidget(parent, viewer)
@@ -195,7 +83,7 @@ ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * viewer)
 
     QTimer *timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(update()));
-    timer->start(10);
+    timer->start(5);
 }
 
 ARViewer::~ARViewer()
@@ -355,7 +243,7 @@ void ARViewer::loadImage(cv::Mat m, bool resize)
     	printf("ERROR: unknown image encoding sent to GLImageWindow::loadImage(cv::Mat m)!\n");
     }
 
-    updateGL();
+//    updateGL();
 
     //printf("load event for image \"%s\"!\n", name.c_str());
     return;
@@ -380,7 +268,7 @@ void ARViewer::keyPressEvent(QKeyEvent *ke)
 {
 	switch(ke->key()){
 		case Qt::Key_R: {
-			Eigen::Vector3f cameraCoordinates ;//= viewer->getCurrentCamDisplay()->camToWorld.matrix().col(3).topRows(3);
+			Eigen::Vector3f cameraCoordinates = viewer->getCurrentCamDisplay()->camToWorld.matrix().col(3).topRows(3);
 			planeEstimator->beginPlaneTracking(cameraCoordinates);
 			arObject->init(cameraCoordinates);
 			arDemo = true;
@@ -464,4 +352,34 @@ void ARViewer::keyReleaseEvent(QKeyEvent *ke){
 	}
 }
 
+void ARViewer::enqueueTimestampedMat(TimestampedMat msg){
+
+	if((std::clock()-currentFrameTime)/(double)CLOCKS_PER_SEC>0.02){
+//		loadImage(msg.image, true);
+		if(imageQueue.size()>60){
+			imageQueue.pop();
+		}
+
+		imageQueue.push(msg);
+		currentFrameTime = std::clock();
+	}
+}
+
+void ARViewer::popImage(double timestamp){
+	while(!imageQueue.empty() && (imageQueue.front().timestamp<=timestamp)){
+		loadImage(imageQueue.front().image, true);
+		imageQueue.pop();
+	}
+}
+
+void ARViewer::checkReset(unsigned int poseId){
+	if(currentFrameID>poseId){
+		printf("AR Demo: detected backward-jump in id (%d to %d), resetting!\n", currentFrameID, poseId);
+
+		while(!imageQueue.empty()) imageQueue.pop();
+		reset();
+	}
+
+	currentFrameID = poseId;
+}
 
