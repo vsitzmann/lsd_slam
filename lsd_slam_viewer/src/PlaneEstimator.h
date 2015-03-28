@@ -15,20 +15,22 @@
 #include "PointCloudViewer.h"
 #include "Octree.h"
 #include "PlaneFittingTools.h"
+#include "ARViewer.h"
 
 class PointCloudViewer;
 class KeyFrameGraphDisplay;
 class KeyFrameDisplay;
 class Octree;
+class ARViewer;
 
 class PlaneEstimator {
 public:
-	PlaneEstimator(PointCloudViewer  * viewer);
+	PlaneEstimator(ARViewer  * viewer);
 	virtual ~PlaneEstimator();
 
 	void flipPlane();
 	void draw();
-	void beginPlaneTracking(const Eigen::Vector3f & cameraCoordinates);
+	void beginPlaneTracking(Eigen::Vector3f & cameraCoordinates);
 	Eigen::Matrix4f getPlaneMatrix();
 	HessianNormalForm getPlane();
 
@@ -44,7 +46,7 @@ public:
 
 /*** Private variables ***/
 private:
-	PointCloudViewer * viewer;
+	ARViewer * arViewer;
 	std::vector<Eigen::Vector3f> consensusSet;
 
 	Eigen::Matrix3f covarianceMatrix;
@@ -95,7 +97,7 @@ private:
 
 	/*** Collision Map ***/
 	void initCollisionMap();
-	void createCollisionMap(const Eigen::Vector3f & cameraCoordinates);
+	void createCollisionMap(Eigen::Vector3f & cameraCoordinates);
 };
 
 #endif /* SRC_PLANEESTIMATOR_H_ */

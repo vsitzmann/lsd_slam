@@ -32,10 +32,6 @@ using namespace std;
 std::clock_t lastDrawTime = 0;
 
 ARObject::ARObject(PlaneEstimator * planeEstimator) {
-	std::string path = ros::package::getPath("lsd_slam_viewer");
-	std::cout<<ros::package::getPath("ueye")<<std::endl;
-	load_obj(path.append("/resources/suzanne.obj").c_str());
-
 	this->planeEstimator = planeEstimator;
 
 	rotAngle = M_PI/20;
@@ -44,8 +40,11 @@ ARObject::ARObject(PlaneEstimator * planeEstimator) {
 	maxVelocity = 0;
 	acceleration = 0;
 	accelerationDirection = 0;
+	height = 0;
 
-	buffersValid = false;
+	std::string path = ros::package::getPath("lsd_slam_viewer");
+	std::cout<<ros::package::getPath("ueye")<<std::endl;
+	load_obj(path.append("/resources/suzanne.obj").c_str());
 }
 
 ARObject::~ARObject() {
@@ -155,6 +154,7 @@ void ARObject::flipNormal(){
 void ARObject::load_obj(const char* filename) {
   ifstream in(filename, ios::in);
   if (!in) { cerr << "Cannot open " << filename << endl; exit(1); }
+  Eigen::Vector4f planeNormal (0,0,1,0);
 
   string line;
   while (getline(in, line)) {
@@ -166,6 +166,9 @@ void ARObject::load_obj(const char* filename) {
       s >> v[1];
       s >> v[2];
       v[3] = 1.0f;
+
+      if(planeNormal.dot(v)>height)
+    	  height = planeNormal.dot(v);
 
       vertices.push_back(v);
     }  else if (line.substr(0,2) == "f ") {

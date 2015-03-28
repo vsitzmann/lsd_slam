@@ -31,6 +31,7 @@ public:
 	Eigen::Matrix4f *getPose();
 	void toggleCollisionChecking();
 	int getNormalSign();
+	float height;
 
 private:
 	Eigen::Matrix <float, 4, 4, Eigen::ColMajor> currentPose;

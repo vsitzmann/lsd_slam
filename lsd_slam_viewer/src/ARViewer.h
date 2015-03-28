@@ -56,7 +56,7 @@ public:
     void popImage(double timestamp);
 
     std::string name;
-    PointCloudViewer * viewer;
+    PointCloudViewer * pcViewer;
     PlaneEstimator * planeEstimator;
     ARObject * arObject;
 private:

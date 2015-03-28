@@ -567,7 +567,7 @@ void Benchmarking::ocRansacToleranceSensitivitySidelengthBased(){
 
 //Assembles the global pointcloud from all keyframe pointclouds *WITH RESPECT TO THE CHOSEN DOWNSAMPLE VALUE*
 void Benchmarking::assemblePointcloud(std::vector<Eigen::Vector3f> *pointcloud){
-	std::vector< KeyFrameDisplay *> keyframes = this->arViewer->viewer->getGraphDisplay()->getKeyframes();
+	std::vector< KeyFrameDisplay *> keyframes = this->arViewer->pcViewer->getGraphDisplay()->getKeyframes();
 
 	for(unsigned int i =0; i<keyframes.size(); i++)
 	{

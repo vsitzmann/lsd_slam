@@ -30,7 +30,7 @@ bool isRunning = false;
 
 int counter = 0;
 
-PlaneEstimator::PlaneEstimator(PointCloudViewer * viewer) {
+PlaneEstimator::PlaneEstimator(ARViewer * arViewer) {
 	// TODO Auto-generated constructor stub
 	generatePlaneVBOs();
 	collisionMapSize = 100;
@@ -42,7 +42,7 @@ PlaneEstimator::PlaneEstimator(PointCloudViewer * viewer) {
 	octree = 0;
 	sceneScale = 0;
 
-	this->viewer = viewer;
+	this->arViewer = arViewer;
 }
 
 PlaneEstimator::~PlaneEstimator() {
@@ -176,8 +176,8 @@ void PlaneEstimator::draw() {
 	}
 }
 
-void PlaneEstimator::beginPlaneTracking(const Eigen::Vector3f & cameraCoordinates){
-	std::vector< KeyFrameDisplay *> keyframes = viewer->getGraphDisplay()->getKeyframes();
+void PlaneEstimator::beginPlaneTracking(Eigen::Vector3f & cameraCoordinates){
+	std::vector< KeyFrameDisplay *> keyframes = arViewer->pcViewer->getGraphDisplay()->getKeyframes();
 
 	calcSceneScale();
 
@@ -251,15 +251,15 @@ void PlaneEstimator::ocRansacConsensusSetID(const std::vector<Eigen::Vector3f> &
 /*** update the plane with the information of the latest frame ***/
 void PlaneEstimator::refreshPlane(){
 	//If there are no keyframes yet, return
-	if(viewer->getGraphDisplay()->getKeyframes().empty()) return;
+	if(arViewer->pcViewer->getGraphDisplay()->getKeyframes().empty()) return;
 
 	//If the number of keyframes didn't change since the last call, return
-	if(lastUpdateFrame == viewer->getGraphDisplay()->getKeyframes().size()) return;
-	lastUpdateFrame = viewer->getGraphDisplay()->getKeyframes().size();
+	if(lastUpdateFrame == arViewer->pcViewer->getGraphDisplay()->getKeyframes().size()) return;
+	lastUpdateFrame = arViewer->pcViewer->getGraphDisplay()->getKeyframes().size();
 
 	std::cout<<"New keyframe pointcloud added. Refreshing plane."<<std::endl;
 
-	KeyFrameDisplay * mostRecentFrame = viewer->getGraphDisplay()->getKeyframes().back();
+	KeyFrameDisplay * mostRecentFrame = arViewer->pcViewer->getGraphDisplay()->getKeyframes().back();
 	std::vector<Eigen::Vector3f> * keyframePointcloud = mostRecentFrame->getKeyframePointcloud();
 
 	//Calculate Hessian Representation of plane
@@ -343,15 +343,16 @@ void PlaneEstimator::initCollisionMap(){
 	}
 }
 
-void PlaneEstimator::createCollisionMap(const Eigen::Vector3f & cameraCoordinates){
-	std::vector<KeyFrameDisplay *> keyframes = viewer->getGraphDisplay()->getKeyframes();
+void PlaneEstimator::createCollisionMap(Eigen::Vector3f & cameraCoordinates){
+	std::vector<KeyFrameDisplay *> keyframes = arViewer->pcViewer->getGraphDisplay()->getKeyframes();
 
 	initCollisionMap();
 	collisionInliers.clear();
 
 	float normalSign;
+	float objectHeight= arViewer->arObject->height;
 
-	if(cameraCoordinates.dot(currentPlane.normal)>0) normalSign = 1;
+	if(PlaneFittingTools::calcSignedPlanePointDis(currentPlane, cameraCoordinates)>0) normalSign = 1;
 	else normalSign = -1;
 
 	for(unsigned int i =0; i<keyframes.size(); i++)
@@ -363,7 +364,7 @@ void PlaneEstimator::createCollisionMap(const Eigen::Vector3f & cameraCoordinate
 
 			float distance = PlaneFittingTools::calcSignedPlanePointDis(currentPlane, currentPoint) * normalSign;
 
-			if( (distance > 2*inlierThreshold*sceneScale) && (distance< 7*inlierThreshold*sceneScale) ){
+			if( (distance > 2*inlierThreshold*sceneScale) && (distance< objectHeight) ){
 				Eigen::Vector3f projectedPoint = PlaneFittingTools::projectPoint(currentPoint, currentPlane);
 				Eigen::Vector4f homogenPoint = Eigen::Vector4f::Ones();
 				homogenPoint.topRows(3) = projectedPoint;
@@ -404,7 +405,7 @@ bool PlaneEstimator::checkCollision(const Eigen::Vector4f &position){
 }
 
 void PlaneEstimator::calcSceneScale(){
-	std::vector< KeyFrameDisplay *> keyframes = viewer->getGraphDisplay()->getKeyframes();
+	std::vector< KeyFrameDisplay *> keyframes = arViewer->pcViewer->getGraphDisplay()->getKeyframes();
 
 	if(keyframes.size()<2) sceneScale = 1;
 

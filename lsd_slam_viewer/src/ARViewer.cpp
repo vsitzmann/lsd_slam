@@ -57,8 +57,8 @@ ARViewer* window = 0;
 
 std::clock_t currentFrameTime = 0;
 
-ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * viewer) :
-    QGLWidget(parent, viewer)
+ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * pcViewer) :
+    QGLWidget(parent, pcViewer)
 {
     setWindowTitle(tr(name.c_str()));
 
@@ -73,13 +73,13 @@ ARViewer::ARViewer(std::string name, QWidget *parent, PointCloudViewer * viewer)
     glViewport(0,0,640,480);
 
     this->name = name;
-    this->viewer = viewer;
-    this->planeEstimator = new PlaneEstimator(viewer);
+    this->pcViewer = pcViewer;
+    this->planeEstimator = new PlaneEstimator(this);
     this->arObject = new ARObject(planeEstimator);
     this->benchmarking = new Benchmarking(this);
 
-	viewer->setPlaneEstimator(this->planeEstimator);
-	viewer->setARObject(arObject);
+	pcViewer->setPlaneEstimator(this->planeEstimator);
+	pcViewer->setARObject(arObject);
 
     QTimer *timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(update()));
@@ -166,26 +166,26 @@ void ARViewer::paintGL()
 			totalTransformation = totalTransformation.inverse();
 
 			glLoadMatrixf(totalTransformation.data());
-		} else glLoadMatrixf(viewer->getModelViewMatrix().data());
+		} else glLoadMatrixf(pcViewer->getModelViewMatrix().data());
 
 		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
 
-			glLoadMatrixf(viewer->getProjectionMatrix().data());
+			glLoadMatrixf(pcViewer->getProjectionMatrix().data());
 
 			glMatrixMode(GL_MODELVIEW);
 
 			glEnable(GL_DEPTH_TEST);
 
 			if(arDemo) {
-				planeEstimator->draw();
+//				planeEstimator->draw();
 
 				glEnable(GL_LIGHTING);
 				if(drawARObject && !ego) arObject->draw();
 				glDisable(GL_LIGHTING);
 			}
 
-			if(drawARPointcloud) viewer->getGraphDisplay()->draw();
+			if(drawARPointcloud) pcViewer->getGraphDisplay()->draw();
 
 			glDisable(GL_DEPTH_TEST);
 
@@ -254,12 +254,12 @@ void ARViewer::reset(){
 	delete arObject;
 	delete benchmarking;
 
-    this->planeEstimator = new PlaneEstimator(viewer);
+    this->planeEstimator = new PlaneEstimator(this);
     this->arObject = new ARObject(planeEstimator);
     this->benchmarking = new Benchmarking(this);
 
-	viewer->setPlaneEstimator(this->planeEstimator);
-	viewer->setARObject(arObject);
+	pcViewer->setPlaneEstimator(this->planeEstimator);
+	pcViewer->setARObject(arObject);
 
     arDemo = false;
 }
@@ -268,9 +268,9 @@ void ARViewer::keyPressEvent(QKeyEvent *ke)
 {
 	switch(ke->key()){
 		case Qt::Key_R: {
-			Eigen::Vector3f cameraCoordinates = viewer->getCurrentCamDisplay()->camToWorld.matrix().col(3).topRows(3);
-			planeEstimator->beginPlaneTracking(cameraCoordinates);
+			Eigen::Vector3f cameraCoordinates = pcViewer->getCurrentCamDisplay()->camToWorld.matrix().col(3).topRows(3);
 			arObject->init(cameraCoordinates);
+			planeEstimator->beginPlaneTracking(cameraCoordinates);
 			arDemo = true;
 		} break;
 		case Qt::Key_Up:
