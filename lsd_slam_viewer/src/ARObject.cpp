@@ -60,8 +60,8 @@ void ARObject::init(const Eigen::Vector3f & cameraCoordinates){
 	accelerationDirection = 0;
 	velocity = 0;
 
-	//Check whether the plane normal points upwards or downwards by calculating the dot product of the
-	//plane normal and the camera's view direction.
+	//Check whether the plane normal points upwards or downwards by calculating the signed distance of the plane
+	//and the camera coordinates
 	if(PlaneFittingTools::calcSignedPlanePointDis(planeEstimator->getPlane(), cameraCoordinates)<0){
 		currentPose.col(2) = currentPose.col(2)*(-1);
 	}
