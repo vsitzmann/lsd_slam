@@ -41,6 +41,7 @@ PlaneEstimator::PlaneEstimator(ARViewer * arViewer) {
 
 	octree = 0;
 	sceneScale = 0;
+	totNumPoints = 0;
 
 	this->arViewer = arViewer;
 }
@@ -201,19 +202,24 @@ void PlaneEstimator::beginPlaneTracking(Eigen::Vector3f & cameraCoordinates){
 
 	std::cout<<"Size of consensus set: "<<consensusSet.size()<<std::endl<<std::endl;
 
-	covarianceMatrix = PlaneFittingTools::pcaPlaneFitting(consensusSet, &initialTangent, &initialBitangent, &initialCenter);
+	totNumPoints = consensusSet.size();
+	covarianceMatrix = PlaneFittingTools::pcaPlaneFitting(consensusSet, &initialTangent, &initialBitangent, &currentPlaneOrigin);
 
 	planeMatrix = Eigen::Matrix4f::Identity();
-	planeMatrix.col(3).topRows(3) = initialCenter;
+	planeMatrix.col(3).topRows(3) = currentPlaneOrigin;
 
 	Eigen::Matrix3f rot;
 
 	rot.col(0) = initialTangent.normalized();
 	rot.col(1) = initialBitangent.normalized();
-	rot.col(2) = initialTangent.cross(initialBitangent).normalized();
+
+	Eigen::Vector3f initialNormal = initialTangent.cross(initialBitangent).normalized();
+	if(initialNormal.dot(currentPlaneOrigin) < 0) initialNormal *= -1;
+
+	rot.col(2) = initialNormal;
 
 	currentPlane.normal = rot.col(2);
-	currentPlane.originDis = currentPlane.normal.dot(initialCenter);
+	currentPlane.originDis = currentPlane.normal.dot(currentPlaneOrigin);
 
 	planeMatrix.topLeftCorner(3,3) = rot;
 
@@ -287,7 +293,10 @@ void PlaneEstimator::refreshPlane(){
 	Eigen::Matrix3f centered = mat.rowwise() - keyframePointcloudMean.transpose();
 	Eigen::Matrix3f keyframeCovMatrix = (centered.adjoint() * centered) / (float)mat.rows();
 
-	//Add "old" covariance Matrix and new one
+	Eigen::Vector3f newConsensusSetMean = (keyframePointcloudMean * keyframeInlierNo + currentPlaneOrigin * totNumPoints)/(totNumPoints + keyframeInlierNo);
+	totNumPoints += keyframeInlierNo;
+
+	//Sum up "old" covariance Matrix and new one
 	covarianceMatrix = (covarianceMatrix + keyframeCovMatrix);
 	Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eig(covarianceMatrix);
 
@@ -299,7 +308,7 @@ void PlaneEstimator::refreshPlane(){
 	bitangent = eig.eigenvectors().col(1);
 	normal = tangent.cross(bitangent).normalized();
 
-	//In order to make the plane keep its original orientation, the initial plane x and y axis are projected
+	//In order to make the plane keep its original orientation, the initial plane's x and y axis are projected
 	//onto the new plane.
 	Eigen::Vector3f x, y, z;
 	x = initialTangent - (initialTangent.dot(normal)) * normal;
@@ -318,10 +327,17 @@ void PlaneEstimator::refreshPlane(){
 	rot.col(1) = y;
 	rot.col(2) = z;
 
+	//Calculate plane equation of plane with the mean of the new consensus set as origin
 	currentPlane.normal = rot.col(2);
-	currentPlane.originDis = currentPlane.normal.dot(initialCenter);
+	currentPlane.originDis = currentPlane.normal.dot(newConsensusSetMean);
+
+	//Project the original origin onto the new plane & set it as the new origin in order to keep
+	//the plane from moving around
+	currentPlaneOrigin = PlaneFittingTools::projectPoint(currentPlaneOrigin, currentPlane);
+	currentPlane.originDis = currentPlane.normal.dot(currentPlaneOrigin);
 
 	planeMatrix.topLeftCorner(3,3) = rot;
+	planeMatrix.col(3).topRows(3) = currentPlaneOrigin;
 
 	planeInlierBufferValid = false;
 }

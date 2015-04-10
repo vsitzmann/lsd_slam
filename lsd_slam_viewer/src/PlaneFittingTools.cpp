@@ -203,12 +203,12 @@ Eigen::Matrix3f PlaneFittingTools::pcaPlaneFitting(const std::vector<Eigen::Vect
 }
 
 Eigen::Vector3f PlaneFittingTools::projectPoint(const Eigen::Vector3f &point, const HessianNormalForm & plane){
-	return point - point.dot(plane.normal)*plane.normal;
+	return point - calcSignedPlanePointDis(plane, point)*plane.normal;
 }
 
 Eigen::Vector4f PlaneFittingTools::projectPoint(const Eigen::Vector4f &point, const HessianNormalForm & plane){
-	Eigen::Vector4f homogenNormal = Eigen::Vector4f::Ones();
+	Eigen::Vector4f homogenNormal = Eigen::Vector4f::Zero();
 	homogenNormal.topRows(3) = plane.normal;
 
-	return point - point.dot(homogenNormal)*homogenNormal;
+	return point - calcSignedPlanePointDis(plane, (Eigen::Vector3f)point.topRows(3))*homogenNormal;
 }

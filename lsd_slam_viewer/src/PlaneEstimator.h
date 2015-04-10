@@ -50,9 +50,10 @@ private:
 	std::vector<Eigen::Vector3f> consensusSet;
 
 	Eigen::Matrix3f covarianceMatrix;
-	Eigen::Vector3f initialCenter;
+	Eigen::Vector3f currentPlaneOrigin;
 	Eigen::Vector3f initialTangent;
 	Eigen::Vector3f initialBitangent;
+	unsigned int totNumPoints;
 
 	bool planeUpdating;
 	bool planeTracking;

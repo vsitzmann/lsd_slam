@@ -269,8 +269,8 @@ void ARViewer::keyPressEvent(QKeyEvent *ke)
 	switch(ke->key()){
 		case Qt::Key_R: {
 			Eigen::Vector3f cameraCoordinates = pcViewer->getCurrentCamDisplay()->camToWorld.matrix().col(3).topRows(3);
-			arObject->init(cameraCoordinates);
 			planeEstimator->beginPlaneTracking(cameraCoordinates);
+			arObject->init(cameraCoordinates);
 			arDemo = true;
 		} break;
 		case Qt::Key_Up:
